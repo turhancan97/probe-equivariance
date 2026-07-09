@@ -7,4 +7,6 @@ loguru>=0.3
 tqdm>=4.50.0
 numpy
 Pillow
-wandb
+# Optional: only needed when wandb.use=true
+
+matplotlib

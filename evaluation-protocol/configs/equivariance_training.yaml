@@ -15,4 +15,5 @@ experiment_model: clip_b16_laion
 training:
   min_samples_per_object: 10
   eval_every_epochs: 1
+  save_checkpoints: false
 output_dir: "results"

@@ -1,0 +1,10 @@
+result_dir: null
+run_config_path: null
+dataset_root: null
+output_dir: null
+output_subdir: visualizations
+checkpoint_subdir: checkpoints
+splits:
+  - train
+  - valid
+  - test

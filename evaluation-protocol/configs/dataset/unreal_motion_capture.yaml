@@ -1,5 +1,5 @@
 _target_: evals.datasets.unreal_motion_capture.UnrealMotionCaptureTask
-root: ../unreal-motion-capture/output
+root: /shared/results/common/kargin/unreal_engine/dataset/probe-equivariance
 image_size: 224
 image_mean: imagenet
 split_ratio: 0.90

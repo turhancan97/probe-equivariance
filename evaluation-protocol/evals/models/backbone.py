@@ -8,7 +8,7 @@ per image, not per-layer token grids.
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Iterable, Tuple
 
 import timm
 import torch
@@ -16,7 +16,7 @@ import torch.nn as nn
 
 # Friendly name -> timm model id.
 BACKBONE_REGISTRY = {
-    "clip_b16_laion": "vit_base_patch16_clip_224.laion2b_s34b_b88k",
+    "clip_b16_laion": ("vit_base_patch16_clip_224.laion2b"),
     "clip_b16_openai": "vit_base_patch16_clip_224.openai",
 }
 
@@ -35,7 +35,7 @@ class FrozenBackbone(nn.Module):
             raise ValueError(f"Unsupported pool mode: {pool}")
 
         timm_id = BACKBONE_REGISTRY.get(name, name)
-        self.model = timm.create_model(timm_id, pretrained=True, num_classes=0)
+        self.model, self.timm_id = _create_model_with_fallbacks(timm_id)
         self.checkpoint_name = name
         self.pool = pool
         self.feat_dim = self.model.num_features
@@ -57,6 +57,22 @@ class FrozenBackbone(nn.Module):
         has_prefix_tokens = getattr(self.model, "num_prefix_tokens", 0) > 0
         patch_tokens = tokens[:, self.model.num_prefix_tokens :] if has_prefix_tokens else tokens
         return patch_tokens.mean(dim=1)
+
+
+def _create_model_with_fallbacks(timm_id: str | Iterable[str]) -> Tuple[nn.Module, str]:
+    candidate_ids = (timm_id,) if isinstance(timm_id, str) else tuple(timm_id)
+    last_error = None
+    for candidate_id in candidate_ids:
+        try:
+            model = timm.create_model(candidate_id, pretrained=True, num_classes=0)
+            return model, candidate_id
+        except (RuntimeError, ValueError) as err:
+            last_error = err
+
+    if last_error is not None:
+        raise last_error
+
+    raise ValueError("No backbone candidates were provided.")
 
 
 def load_backbone(name: str, pool: str = "mean") -> Tuple[FrozenBackbone, int]:

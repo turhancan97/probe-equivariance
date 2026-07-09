@@ -4,6 +4,7 @@ fit to unreal-motion-capture's actual recording layout. Single-GPU only.
 
 from __future__ import annotations
 
+import json
 import math
 from collections import defaultdict
 from dataclasses import dataclass
@@ -13,12 +14,16 @@ from typing import DefaultDict, Dict, List, Tuple
 
 import hydra
 import torch
-import wandb
 from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
+
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 from evals.datasets.builder import build_loader
 from evals.datasets.unreal_motion_capture import regression_dim
@@ -30,6 +35,12 @@ from evals.utils.seed import set_random_seed
 def _sanitize_name(name: str) -> str:
     sanitized = name.replace("/", "_").replace(" ", "_").replace("-", "_")
     return "".join(c for c in sanitized if c.isalnum() or c == "_").lower()
+
+
+def checkpoint_name(environment: str, mode: str, object_name: str) -> str:
+    return "__".join(
+        [_sanitize_name(environment), _sanitize_name(mode), _sanitize_name(object_name)]
+    ) + ".pt"
 
 
 @dataclass
@@ -110,7 +121,13 @@ def train_probe(
     log_to_wandb: bool,
 ) -> Dict[str, float]:
     if train_features.numel() == 0:
-        return {"train_mse": float("nan"), "train_rmse": float("nan"), "val_mse": float("nan"), "val_rmse": float("nan"), "head": head}
+        return {
+            "train_mse": float("nan"),
+            "train_rmse": float("nan"),
+            "val_mse": float("nan"),
+            "val_rmse": float("nan"),
+            "head": head,
+        }
 
     head = head.to(device)
     optimizer = torch.optim.AdamW(
@@ -120,7 +137,10 @@ def train_probe(
     steps_per_epoch = max(1, math.ceil(train_features.size(0) / max(1, cfg.batch_size)))
     total_steps = cfg.optimizer.n_epochs * steps_per_epoch
     warmup_steps = max(1, int(cfg.optimizer.warmup_epochs * steps_per_epoch))
-    scheduler = LambdaLR(optimizer, lr_lambda=lambda step: cosine_decay_linear_warmup(step, total_steps, warmup_steps))
+    scheduler = LambdaLR(
+        optimizer,
+        lr_lambda=lambda step: cosine_decay_linear_warmup(step, total_steps, warmup_steps),
+    )
     loss_fn = torch.nn.MSELoss()
 
     indices = torch.arange(train_features.size(0))
@@ -155,19 +175,64 @@ def train_probe(
     train_mse = float(torch.mean((train_preds - train_targets) ** 2).item())
     val_mse, val_rmse = evaluate_head(head, val_features, val_targets, device)
 
-    return {"train_mse": train_mse, "train_rmse": train_rmse, "val_mse": val_mse, "val_rmse": val_rmse, "head": head}
+    return {
+        "train_mse": train_mse,
+        "train_rmse": train_rmse,
+        "val_mse": val_mse,
+        "val_rmse": val_rmse,
+        "head": head,
+    }
+
+
+def save_probe_checkpoint(
+    checkpoint_path: Path,
+    head,
+    feat_dim: int,
+    output_dim: int,
+    environment: str,
+    mode: str,
+    object_name: str,
+    cfg: DictConfig,
+) -> None:
+    payload = {
+        "environment": environment,
+        "mode": mode,
+        "object": object_name,
+        "feat_dim": feat_dim,
+        "output_dim": output_dim,
+        "backbone": {
+            "name": cfg.backbone.name,
+            "pool": cfg.backbone.pool,
+        },
+        "probe": OmegaConf.to_container(cfg.probe, resolve=True),
+        "state_dict": head.cpu().state_dict(),
+    }
+    torch.save(payload, checkpoint_path)
 
 
 def run_equivariance(cfg: DictConfig) -> None:
     set_random_seed(cfg.system.random_seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use_wandb = bool(cfg.wandb.use)
 
     exp_path = Path(__file__).parent / f"equivariance_exps/{datetime.now().strftime('%d%m%Y-%H%M')}"
     exp_path.mkdir(parents=True, exist_ok=True)
     logger.add(exp_path / "training.log")
     logger.info("Config:\n{}", OmegaConf.to_yaml(cfg))
 
-    if cfg.wandb.use:
+    result_dir = Path(cfg.output_dir) / f"equivariance_{cfg.experiment_name}"
+    result_dir.mkdir(parents=True, exist_ok=True)
+    (result_dir / "run_config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True))
+
+    save_checkpoints = bool(cfg.training.save_checkpoints)
+    checkpoint_dir = result_dir / "checkpoints"
+    if save_checkpoints:
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    if use_wandb and wandb is None:
+        raise ModuleNotFoundError("wandb.use=true, but wandb is not installed.")
+
+    if use_wandb:
         wandb.init(
             project="probe-equivariance",
             config=OmegaConf.to_container(cfg, resolve=True),
@@ -190,6 +255,7 @@ def run_equivariance(cfg: DictConfig) -> None:
     head_name = cfg.probe.get("_target_", "probe")
 
     results = []
+    checkpoint_manifest = []
     keys = sorted(train_groups.keys())
 
     for key in tqdm(keys, desc="Groups"):
@@ -197,15 +263,41 @@ def run_equivariance(cfg: DictConfig) -> None:
         train_records = train_groups.get(key, [])
         val_records = val_groups.get(key, [])
         test_records = test_groups.get(key, [])
+        log_prefix = "_".join([
+            _sanitize_name(environment),
+            _sanitize_name(mode),
+            _sanitize_name(object_name),
+        ])
 
         if len(train_records) < cfg.training.min_samples_per_object:
-            logger.info(f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_records)})")
+            logger.info(
+                f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_records)})"
+            )
             results.append(
                 {
-                    "environment": environment, "mode": mode, "object": object_name,
-                    "train_mse": float("nan"), "val_mse": float("nan"), "test_mse": float("nan"),
-                    "train_rmse": float("nan"), "val_rmse": float("nan"), "test_rmse": float("nan"),
-                    "num_train": len(train_records), "num_val": len(val_records), "num_test": len(test_records),
+                    "environment": environment,
+                    "mode": mode,
+                    "object": object_name,
+                    "train_mse": float("nan"),
+                    "val_mse": float("nan"),
+                    "test_mse": float("nan"),
+                    "train_rmse": float("nan"),
+                    "val_rmse": float("nan"),
+                    "test_rmse": float("nan"),
+                    "num_train": len(train_records),
+                    "num_val": len(val_records),
+                    "num_test": len(test_records),
+                }
+            )
+            checkpoint_manifest.append(
+                {
+                    "environment": environment,
+                    "mode": mode,
+                    "object": object_name,
+                    "checkpoint_path": None,
+                    "num_train": len(train_records),
+                    "num_val": len(val_records),
+                    "num_test": len(test_records),
                 }
             )
             continue
@@ -217,32 +309,64 @@ def run_equivariance(cfg: DictConfig) -> None:
         output_dim = regression_dim(mode)
         head = instantiate(cfg.probe, feat_dim=feat_dim, output_dim=output_dim)
 
-        log_prefix = "_".join([_sanitize_name(environment), _sanitize_name(mode), _sanitize_name(object_name)])
-
         metrics = train_probe(
-            head, train_features, train_targets, val_features, val_targets, device, cfg, log_prefix, cfg.wandb.use
+            head, train_features, train_targets, val_features, val_targets, device, cfg, log_prefix, use_wandb
         )
         trained_head = metrics.pop("head")
         test_mse, test_rmse = evaluate_head(trained_head, test_features, test_targets, device)
 
+        checkpoint_relpath = None
+        if save_checkpoints:
+            checkpoint_path = checkpoint_dir / checkpoint_name(environment, mode, object_name)
+            save_probe_checkpoint(
+                checkpoint_path,
+                trained_head,
+                feat_dim,
+                output_dim,
+                environment,
+                mode,
+                object_name,
+                cfg,
+            )
+            checkpoint_relpath = checkpoint_path.relative_to(result_dir).as_posix()
+
         results.append(
             {
-                "environment": environment, "mode": mode, "object": object_name,
-                "train_mse": metrics["train_mse"], "val_mse": metrics["val_mse"], "test_mse": test_mse,
-                "train_rmse": metrics["train_rmse"], "val_rmse": metrics["val_rmse"], "test_rmse": test_rmse,
-                "num_train": len(train_records), "num_val": len(val_records), "num_test": len(test_records),
+                "environment": environment,
+                "mode": mode,
+                "object": object_name,
+                "train_mse": metrics["train_mse"],
+                "val_mse": metrics["val_mse"],
+                "test_mse": test_mse,
+                "train_rmse": metrics["train_rmse"],
+                "val_rmse": metrics["val_rmse"],
+                "test_rmse": test_rmse,
+                "num_train": len(train_records),
+                "num_val": len(val_records),
+                "num_test": len(test_records),
+            }
+        )
+        checkpoint_manifest.append(
+            {
+                "environment": environment,
+                "mode": mode,
+                "object": object_name,
+                "checkpoint_path": checkpoint_relpath,
+                "num_train": len(train_records),
+                "num_val": len(val_records),
+                "num_test": len(test_records),
             }
         )
 
-    result_dir = Path(cfg.output_dir) / f"equivariance_{cfg.experiment_name}"
-    result_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%d%m%Y-%H%M")
 
     object_csv = result_dir / "object_metrics.csv"
     new_file = not object_csv.exists()
     with object_csv.open("a") as f:
         if new_file:
-            f.write("Timestamp,Experiment,Environment,Mode,Object,Train RMSE,Val RMSE,Test RMSE,Num Train,Num Val,Num Test,Backbone,Head\n")
+            f.write(
+                "Timestamp,Experiment,Environment,Mode,Object,Train RMSE,Val RMSE,Test RMSE,Num Train,Num Val,Num Test,Backbone,Head\n"
+            )
         for row in results:
             f.write(
                 f"{timestamp},{cfg.experiment_name},{row['environment']},{row['mode']},{row['object']},"
@@ -269,7 +393,17 @@ def run_equivariance(cfg: DictConfig) -> None:
                     row_values.append(str(avg))
             f.write(",".join(row_values) + "\n")
 
-    if cfg.wandb.use:
+    manifest_payload = {
+        "timestamp": timestamp,
+        "experiment_name": cfg.experiment_name,
+        "backbone": backbone_name,
+        "head": head_name,
+        "save_checkpoints": save_checkpoints,
+        "groups": checkpoint_manifest,
+    }
+    (result_dir / "checkpoint_manifest.json").write_text(json.dumps(manifest_payload, indent=2))
+
+    if use_wandb:
         wandb.finish()
 
 
