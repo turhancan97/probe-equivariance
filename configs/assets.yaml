@@ -285,3 +285,14 @@ objects:
       bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
       desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
       winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }
+
+  - name: cube
+    category: basic
+    mesh_path: "/Game/LevelPrototyping/Meshes/SM_ChamferCube.SM_ChamferCube"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1160.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+      FirstPersonMap: { x: 1621.0, y: 1673.0, z: 75.0, yaw: 0.0 }

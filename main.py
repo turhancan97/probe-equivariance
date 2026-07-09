@@ -18,7 +18,7 @@ importlib.reload(mesh_actor)
 importlib.reload(motion)
 importlib.reload(utils)
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "run.yaml")
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "run_single.yaml")
 
 
 def render_one(obj_cfg, mode_name, run_cfg):
