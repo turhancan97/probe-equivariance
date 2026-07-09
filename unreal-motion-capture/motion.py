@@ -32,6 +32,7 @@ def camera_line(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, y
         yield yield_time
 
     serialize.save_poses(pose_list, save_dir, prefix, suffix="camera_poses.json")
+    serialize.save_meta({"x": obj_loc.x, "y": obj_loc.y, "z": obj_loc.z}, dict(mode_cfg), save_dir, prefix)
 
 
 def camera_orbit(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, yield_time):
@@ -58,6 +59,7 @@ def camera_orbit(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, 
         yield yield_time
 
     serialize.save_poses(pose_list, save_dir, prefix, suffix="camera_poses.json")
+    serialize.save_meta({"x": obj_loc.x, "y": obj_loc.y, "z": obj_loc.z}, dict(mode_cfg), save_dir, prefix)
 
 
 def object_line(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, yield_time):
@@ -90,6 +92,7 @@ def object_line(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, y
         yield yield_time
 
     serialize.save_poses(pose_list, save_dir, prefix, suffix="object_poses.json")
+    serialize.save_meta({"x": obj_loc.x, "y": obj_loc.y, "z": obj_loc.z}, dict(mode_cfg), save_dir, prefix)
 
 
 def object_orbit(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, yield_time):
@@ -122,6 +125,7 @@ def object_orbit(cam, obj_mesh, obj_loc, mode_cfg, image_res, save_dir, prefix, 
         yield yield_time
 
     serialize.save_poses(pose_list, save_dir, prefix, suffix="object_poses.json")
+    serialize.save_meta({"x": obj_loc.x, "y": obj_loc.y, "z": obj_loc.z}, dict(mode_cfg), save_dir, prefix)
 
 
 MODES = {

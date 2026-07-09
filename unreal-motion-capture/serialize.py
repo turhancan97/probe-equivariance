@@ -34,3 +34,10 @@ def save_poses(pose_list: List[Dict], save_dir: str, prefix: str, suffix: str = 
     with open(path, "w") as f:
         json.dump(pose_list, f, indent=2)
     return path
+
+
+def save_meta(obj_loc: Dict, mode_cfg: Dict, save_dir: str, prefix: str) -> str:
+    path = os.path.join(save_dir, f"{prefix}_meta.json")
+    with open(path, "w") as f:
+        json.dump({"obj_loc": obj_loc, "mode_cfg": mode_cfg}, f, indent=2)
+    return path
