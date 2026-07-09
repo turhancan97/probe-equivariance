@@ -1,0 +1,37 @@
+# Example run: exactly one asset, in exactly one environment.
+# Swap the "name" and "environment" values below for quick one-off tests.
+assets_catalog: "assets.yaml"
+environment: winter_town           # one of: city, forest, bridge, desert, winter_town
+
+select:
+  names: ["cat"]                    # exactly one object name from assets.yaml
+
+output_dir: "C:/Users/turha/Documents/Unreal Projects/spatial_intelligence/Content/Python/unreal-motion-capture/output"
+image_width: 1280
+image_height: 720
+yield_time: 1.0
+
+modes: ["camera_line", "camera_orbit", "object_line", "object_orbit"]
+
+camera_line:
+  distance_x: 1100
+  height: 120
+  line_half_span: 600
+  steps: 60
+
+camera_orbit:
+  radius: 1000
+  height: 175
+  steps: 60
+
+object_line:
+  distance_x: 2500
+  height: 350
+  line_half_span: 600
+  steps: 60
+
+object_orbit:
+  radius: 800
+  height: 350
+  camera_distance_x: 2500
+  steps: 60

@@ -35,7 +35,9 @@ Unreal's embedded Python needs PyYAML:
 
 Edit `configs/run.yaml` (environment, object selection, per-mode radius/height/span/steps,
 output directory) — or point `main.py`'s `CONFIG_PATH` at a different run config, e.g.
-`configs/run_animals_forest.yaml` — then run `main.py` from Unreal's Python console/execute-script.
+`configs/run_animals_forest.yaml` (one category, one environment) or
+`configs/run_single.yaml` (exactly one asset, one environment — set `select.names` to a
+single-item list) — then run `main.py` from Unreal's Python console/execute-script.
 
 To add a new object: add one entry to `configs/assets.yaml` with a `locations` map
 covering whichever environments you need. To add a new environment: add that key to
