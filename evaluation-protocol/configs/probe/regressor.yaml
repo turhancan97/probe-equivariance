@@ -1,0 +1,2 @@
+_target_: evals.models.probe.RegressionHead
+use_layernorm: true

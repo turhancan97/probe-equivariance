@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+evaluation-protocol/results/
+evaluation-protocol/equivariance_exps/

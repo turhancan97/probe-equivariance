@@ -1,0 +1,4 @@
+probe_lr: 0.001
+weight_decay: 0.001
+n_epochs: 200
+warmup_epochs: 50

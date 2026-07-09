@@ -1,0 +1,18 @@
+system:
+  random_seed: 8
+note: ""
+batch_size: 64
+wandb:
+  use: false
+defaults:
+  - optimizer: default
+  - backbone: clip_b16_laion
+  - dataset: unreal_motion_capture
+  - probe: regressor
+  - _self_
+experiment_name: example_scenario
+experiment_model: clip_b16_laion
+training:
+  min_samples_per_object: 10
+  eval_every_epochs: 1
+output_dir: "results"
