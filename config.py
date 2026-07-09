@@ -34,14 +34,63 @@ class RunConfig:
     camera_orbit: Dict
     object_line: Dict
     object_orbit: Dict
+    environment: str
     objects: List[ObjectConfig] = field(default_factory=list)
 
 
-def load_config(path: str) -> RunConfig:
+def _load_yaml(path: str) -> Dict:
     with open(path, "r") as f:
-        raw = yaml.safe_load(f)
+        return yaml.safe_load(f)
 
-    objects = [ObjectConfig(**o) for o in raw.get("objects", [])]
+
+def _resolve_objects(catalog_objects: List[Dict], environment: str, select: Dict) -> List[ObjectConfig]:
+    names = select.get("names", ["all"])
+    categories = select.get("categories", [])
+    want_all_names = names == "all" or names == ["all"]
+
+    resolved: List[ObjectConfig] = []
+    for entry in catalog_objects:
+        if not want_all_names and entry["name"] not in names:
+            continue
+        if categories and entry.get("category") not in categories:
+            continue
+
+        locations = entry.get("locations", {})
+        if environment not in locations:
+            raise ValueError(
+                f"Object '{entry['name']}' has no location defined for environment '{environment}'"
+            )
+        loc = locations[environment]
+
+        resolved.append(ObjectConfig(
+            name=entry["name"],
+            category=entry.get("category"),
+            mesh_path=entry["mesh_path"],
+            material_path=entry.get("material_path"),
+            material_slot=int(entry.get("material_slot", 0)),
+            scale=entry.get("scale"),
+            location={"x": float(loc["x"]), "y": float(loc["y"]), "z": float(loc["z"])},
+            yaw=float(loc.get("yaw", entry.get("yaw", 0.0))),
+        ))
+
+    if not resolved:
+        raise ValueError(
+            f"No objects matched select={select!r} for environment '{environment}' — check names/categories."
+        )
+    return resolved
+
+
+def load_config(run_path: str) -> RunConfig:
+    raw = _load_yaml(run_path)
+
+    catalog_path = raw["assets_catalog"]
+    if not os.path.isabs(catalog_path):
+        catalog_path = os.path.join(os.path.dirname(os.path.abspath(run_path)), catalog_path)
+    catalog = _load_yaml(catalog_path)
+
+    environment = raw["environment"]
+    select = raw.get("select", {"names": ["all"]})
+    objects = _resolve_objects(catalog.get("objects", []), environment, select)
 
     return RunConfig(
         output_dir=raw["output_dir"],
@@ -53,5 +102,6 @@ def load_config(path: str) -> RunConfig:
         camera_orbit=raw.get("camera_orbit", {}),
         object_line=raw.get("object_line", {}),
         object_orbit=raw.get("object_orbit", {}),
+        environment=environment,
         objects=objects,
     )

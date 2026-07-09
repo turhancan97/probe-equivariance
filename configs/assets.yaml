@@ -1,0 +1,287 @@
+# Asset catalog: one entry per object, with a spawn location+yaw for each
+# environment it can be recorded in. Ported from the CITY/FOREST/BRIDGE/
+# DESERT/WINTER_TOWN if/elif tables in record_line.py / record_orbit.py /
+# record_object_move.py. Run configs (e.g. configs/run.yaml) pick one
+# `environment` and a `select` filter over this catalog — this file itself
+# does not choose what to run.
+
+objects:
+  - name: vehicle01_Van
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle01_Van/Mesh/SM_vehVan_vehicle01_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle09_Van
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle09_Van/Mesh/SM_vehVan_vehicle09_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle02_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle02_Car/Mesh/SM_vehCar_vehicle02_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle03_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle03_Car/Mesh/SM_vehCar_vehicle03_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle05_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle05_Car/Mesh/SM_vehCar_vehicle05_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle06_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle06_Car/Mesh/SM_vehCar_vehicle06_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle12_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle12_Car/Mesh/SM_vehCar_vehicle12_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: vehicle13_Car
+    category: vehicles
+    mesh_path: "/Game/CitySampleVehicles/vehicle13_Car/Mesh/SM_vehCar_vehicle13_LOD"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1080.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -20.0, z: 0.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.0, yaw: 0.0 }
+
+  - name: old_bicycle
+    category: vehicles
+    mesh_path: "/Game/sketchfab/old_bicycle/StaticMeshes/SM_old_bicycle"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 140.0, yaw: 90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1230.0, yaw: 90.0 }
+      bridge: { x: -5480.0, y: -26.0, z: 70.0, yaw: 90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36108.0, yaw: 90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 200.0, yaw: 90.0 }
+
+  - name: cyclist
+    category: people
+    mesh_path: "/Game/sketchfab/Cyclist_-_racing_position_-_free_3d_printable/StaticMeshes/cyclist"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 117.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1207.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 47.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36133.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 177.0, yaw: 0.0 }
+
+  - name: motorcycle
+    category: vehicles
+    mesh_path: "/Game/sketchfab/Motorcycle/StaticMeshes/motorcycle"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 99.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1189.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 29.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36148.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 160.0, yaw: -90.0 }
+
+  - name: motorcyclist
+    category: people
+    mesh_path: "/Game/sketchfab/Motorcyclist_with_rider/StaticMeshes/motorcyclist"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 142.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1232.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 72.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36108.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 202.0, yaw: -90.0 }
+
+  - name: cat
+    category: animals
+    mesh_path: "/Game/sketchfab/cat/StaticMeshes/cat"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.4, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.4, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 1.4, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.4, yaw: -90.0 }
+
+  - name: dog
+    category: animals
+    mesh_path: "/Game/sketchfab/dog/StaticMeshes/dog"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }
+
+  - name: horse
+    category: animals
+    mesh_path: "/Game/sketchfab/horse/StaticMeshes/horse"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }
+
+  - name: lion
+    category: animals
+    mesh_path: "/Game/sketchfab/lion/StaticMeshes/lion"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 160.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1250.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -15.0, z: 90.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36087.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 220.0, yaw: -90.0 }
+
+  - name: bear
+    category: animals
+    mesh_path: "/Game/sketchfab/bear/StaticMeshes/bear"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: 90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: 90.0 }
+      bridge: { x: -5480.0, y: -55.0, z: 3.0, yaw: 90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36176.0, yaw: 90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: 90.0 }
+
+  - name: fridge
+    category: furniture
+    mesh_path: "/Game/sketchfab/fridge/StaticMeshes/fridge"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -15.0, z: 1.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36177.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.0, yaw: 0.0 }
+
+  - name: washing_machine
+    category: furniture
+    mesh_path: "/Game/sketchfab/washing_machine/StaticMeshes/washing_machine"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 151.0, yaw: 90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1241.0, yaw: 90.0 }
+      bridge: { x: -5480.0, y: -27.0, z: 81.0, yaw: 90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36100.0, yaw: 90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 211.0, yaw: 90.0 }
+
+  - name: bed
+    category: furniture
+    mesh_path: "/Game/sketchfab/bed/StaticMeshes/bed"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.3, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.3, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 1.3, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36177.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.3, yaw: -90.0 }
+
+  - name: table
+    category: furniture
+    mesh_path: "/Game/sketchfab/table/StaticMeshes/table"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 70.5, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1160.5, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 0.5, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.5, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 130.5, yaw: 0.0 }
+
+  - name: plant
+    category: furniture
+    mesh_path: "/Game/sketchfab/plant/StaticMeshes/plant"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }
+
+  - name: tree
+    category: furniture
+    mesh_path: "/Game/sketchfab/tree/StaticMeshes/tree"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.3, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.3, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 1.3, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36177.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.3, yaw: -90.0 }
+
+  - name: rp_fabienne_percy
+    category: people
+    mesh_path: "/Game/Scanned3DPeoplePack/RP_Character/rp_fabienne_percy_posed_001_ue4/rp_fabienne_percy_posed_001"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 1.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.0, yaw: 0.0 }
+
+  - name: rp_dennis
+    category: people
+    mesh_path: "/Game/Scanned3DPeoplePack/RP_Character/rp_dennis_posed_004_ue4/rp_dennis_posed_004"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 1.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.0, yaw: 0.0 }
+
+  - name: rp_mei
+    category: people
+    mesh_path: "/Game/Scanned3DPeoplePack/RP_Character/rp_mei_posed_001_ue4/rp_mei_posed_001"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 71.0, yaw: 0.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1161.0, yaw: 0.0 }
+      bridge: { x: -5480.0, y: -25.0, z: 1.0, yaw: 0.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36178.0, yaw: 0.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 131.0, yaw: 0.0 }
+
+  - name: traffic_cone
+    category: furniture
+    mesh_path: "/Game/sketchfab/Traffic_cone_Game_ready/StaticMeshes/traffic_cone"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }
+
+  - name: sofa
+    category: furniture
+    mesh_path: "/Game/sketchfab/sofa/StaticMeshes/sofa"
+    locations:
+      city: { x: 12950.0, y: -22870.0, z: 73.0, yaw: -90.0 }
+      forest: { x: 121840.0, y: -65560.0, z: 1163.0, yaw: -90.0 }
+      bridge: { x: -5480.0, y: -31.0, z: 3.0, yaw: -90.0 }
+      desert: { x: -75901.0, y: 132290.0, z: -36175.0, yaw: -90.0 }
+      winter_town: { x: 285.0, y: -2263.0, z: 133.0, yaw: -90.0 }

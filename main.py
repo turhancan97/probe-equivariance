@@ -18,7 +18,7 @@ importlib.reload(mesh_actor)
 importlib.reload(motion)
 importlib.reload(utils)
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "example.yaml")
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "run.yaml")
 
 
 def render_one(obj_cfg, mode_name, run_cfg):
@@ -39,7 +39,7 @@ def render_one(obj_cfg, mode_name, run_cfg):
     cam = camera.RenderCineCamera(label=f"{obj_cfg.name}_camera")
 
     mode_cfg = getattr(run_cfg, mode_name)
-    save_dir = os.path.join(run_cfg.output_dir, obj_cfg.name, mode_name)
+    save_dir = os.path.join(run_cfg.output_dir, run_cfg.environment, obj_cfg.name, mode_name)
     os.makedirs(save_dir, exist_ok=True)
 
     image_res = (run_cfg.image_width, run_cfg.image_height)
