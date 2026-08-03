@@ -6,32 +6,32 @@ environment: FirstPersonMap                  # one of: city, forest, bridge, des
 select:
   names: ["cube"]                   # exactly one object name from assets.yaml
 
-output_dir: "C:/Users/turha/Documents/Unreal Projects/spatial_intelligence/Content/Python/unreal-motion-capture/output"
+output_dir: "C:/Users/turha/Documents/Unreal Projects/spatial_intelligence/Content/Python/probe-equivariance/unreal-motion-capture/output"
 image_width: 448
 image_height: 448
 yield_time: 1.0
 
-modes: ["camera_line", "camera_orbit", "object_line", "object_orbit"]
+modes: ["camera_orbit", "object_orbit", "camera_line", "object_line"]
 
 camera_line:
   distance_x: 700
   height: 120
   line_half_span: 600
-  steps: 60
+  steps: 360
 
 camera_orbit:
-  radius: 1000
-  height: 250
-  steps: 60
-
-object_line:
-  distance_x: 750
-  height: 120
-  line_half_span: 600
-  steps: 60
-
-object_orbit:
   radius: 700
   height: 250
-  camera_distance_x: 750
-  steps: 60
+  steps: 360
+
+object_line:
+  distance_x: 1200
+  height: 120
+  line_half_span: 500
+  steps: 360
+
+object_orbit:
+  radius: 500
+  height: 250
+  camera_distance_x: 1200
+  steps: 360
