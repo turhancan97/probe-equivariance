@@ -16,6 +16,7 @@ Added AI-first handoff documentation for future sessions and recorded the curren
 - added this `CHANGELOG.md` as a reverse-chronological session log
 - documented current supported workflows, operating rules, next steps, and known-good commands
 - captured the current status of Efficient Probing, visualization, and smoke-test usage
+- recorded a new future direction for representation visualization with `PCA`, `t-SNE`, or `UMAP` over per-frame backbone features from a chosen video directory, using either the CLS token or global average pooled patch tokens
 
 ### Verification
 
@@ -34,6 +35,7 @@ Verification status: partial
 
 - update these two files after every material `evaluation-protocol/` change
 - if new probe or backbone behavior is added, record the supported combinations and verification status here
+- when this representation-visualization feature is implemented, keep it as a separate workflow and document its config surface, supported representation types, and verification status
 
 ## 2026-07-09
 

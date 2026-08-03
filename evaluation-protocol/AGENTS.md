@@ -119,12 +119,14 @@ Near-term likely follow-ups:
 - keep agent handoff docs current after each material change
 - extend smoke coverage when new backbones, probes, or dataset behaviors are added
 - preserve clear validation errors for unsupported probe/backbone combinations
+- define the config surface for a future representation-visualization workflow before implementing it
 
 ## Longer-Term Roadmap
 
 - add more backbone configurations and verify their normalization defaults carefully
 - expand probe options beyond the current MLP and single-head Efficient Probing path if there is a concrete use case
 - improve experiment bookkeeping if session history or checkpoint metadata becomes harder to trace
+- add a separate representation-visualization workflow that can take a specific video directory such as `/shared/results/common/kargin/unreal_engine/dataset/probe-equivariance/FirstPersonMap/cube/camera_line`, a chosen backbone, a representation type (`cls` or global average pooled patch tokens), and a dimensionality-reduction method (`PCA`, `t-SNE`, or `UMAP`) to visualize per-frame representations; this is future work only and is not implemented yet
 
 ## Rejected / Avoid
 
