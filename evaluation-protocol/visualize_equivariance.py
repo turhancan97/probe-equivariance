@@ -16,10 +16,19 @@ from omegaconf import DictConfig, OmegaConf
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from evals.datasets.builder import build_dataset, build_loader
 from evals.datasets.unreal_motion_capture import LINE_MODES, ORBIT_MODES, regression_dim
 from evals.models.backbone import load_backbone
-from train_equivariance import collect_split_features, compute_rmse, stack_records, checkpoint_name
-from evals.datasets.builder import build_loader
+from train_equivariance import (
+    build_group_loader,
+    checkpoint_name,
+    collect_split_features,
+    compute_rmse,
+    is_efficient_probing_probe,
+    predict_from_image_loader,
+    stack_records,
+    validate_probe_backbone_compatibility,
+)
 
 SPLIT_PRED_COLORS = {
     "train": "tab:orange",
@@ -149,6 +158,8 @@ def run_visualization(cfg: DictConfig) -> None:
         raise FileNotFoundError(f"Result directory does not exist: {result_dir}")
 
     run_cfg = _load_run_config(result_dir, cfg)
+    validate_probe_backbone_compatibility(run_cfg)
+    uses_ep = is_efficient_probing_probe(run_cfg.probe)
     splits = _ensure_split_names(cfg.splits)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -159,8 +170,79 @@ def run_visualization(cfg: DictConfig) -> None:
             f"Checkpoint directory not found: {checkpoint_dir}. Enable training.save_checkpoints during training first."
         )
 
-    model, feat_dim = load_backbone(run_cfg.backbone.name, pool=run_cfg.backbone.pool)
+    model, feat_dim = load_backbone(
+        run_cfg.backbone.name,
+        pool=run_cfg.backbone.pool,
+        image_mean=run_cfg.backbone.get("image_mean"),
+        custom_mean=run_cfg.backbone.get("custom_mean"),
+        custom_std=run_cfg.backbone.get("custom_std"),
+    )
     model = model.to(device)
+    norm_overrides = {}
+    if getattr(model, "normalize_mean", None) is not None and getattr(model, "normalize_std", None) is not None:
+        norm_overrides = {"mean": model.normalize_mean, "std": model.normalize_std}
+
+    if uses_ep:
+        split_datasets: dict[str, object] = {}
+        all_group_keys = set()
+        for split in splits:
+            if split == "test" and float(run_cfg.dataset.test_ratio) <= 0:
+                logger.info("Skipping test split because dataset.test_ratio <= 0")
+                continue
+
+            dataset = build_dataset(run_cfg.dataset, split, **norm_overrides)
+            split_datasets[split] = dataset
+            group_keys = dataset.group_indices_by_split[split].keys()
+            all_group_keys.update(group_keys)
+            if not group_keys:
+                logger.info(f"No samples found for split: {split}")
+
+        for environment, mode, object_name in sorted(all_group_keys):
+            checkpoint_path = checkpoint_dir / checkpoint_name(environment, mode, object_name)
+            if not checkpoint_path.exists():
+                logger.warning(f"Missing checkpoint for {environment}/{mode}/{object_name}: {checkpoint_path}")
+                continue
+
+            head = _load_group_head(checkpoint_path, run_cfg, feat_dim, device)
+            split_targets: dict[str, torch.Tensor] = {}
+            split_preds: dict[str, torch.Tensor] = {}
+
+            for split in splits:
+                dataset = split_datasets.get(split)
+                if dataset is None:
+                    continue
+
+                loader, _ = build_group_loader(dataset, split, (environment, mode, object_name), run_cfg.batch_size)
+                if loader is None:
+                    continue
+
+                preds, targets = predict_from_image_loader(head, model, loader, device)
+                if preds.numel() == 0:
+                    continue
+
+                expected_dim = regression_dim(mode)
+                if preds.shape[1] != expected_dim:
+                    raise ValueError(
+                        f"Checkpoint output dim mismatch for {environment}/{mode}/{object_name}: "
+                        f"expected {expected_dim}, got {preds.shape[1]}"
+                    )
+
+                split_targets[split] = targets
+                split_preds[split] = preds
+
+            if not split_preds:
+                continue
+
+            filename = checkpoint_name(environment, mode, object_name).replace('.pt', '.png')
+            plot_group_predictions(
+                output_dir / filename,
+                environment,
+                mode,
+                object_name,
+                split_targets,
+                split_preds,
+            )
+        return
 
     groups_by_split: dict[str, dict] = {}
     all_group_keys = set()
@@ -169,7 +251,7 @@ def run_visualization(cfg: DictConfig) -> None:
             logger.info("Skipping test split because dataset.test_ratio <= 0")
             continue
 
-        loader = build_loader(run_cfg.dataset, split, run_cfg.batch_size)
+        loader = build_loader(run_cfg.dataset, split, run_cfg.batch_size, **norm_overrides)
         groups = collect_split_features(loader, model, device)
         groups_by_split[split] = groups
         all_group_keys.update(groups.keys())

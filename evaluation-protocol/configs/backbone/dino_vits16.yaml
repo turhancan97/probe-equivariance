@@ -1,0 +1,3 @@
+name: dino_vits16
+pool: mean # mean | cls | patch
+image_mean: imagenet # imagenet | clip | custom

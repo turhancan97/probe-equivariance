@@ -1,0 +1,3 @@
+name: deit3_small
+pool: mean # mean | cls | patch
+image_mean: imagenet # imagenet | clip | custom

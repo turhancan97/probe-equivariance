@@ -6,14 +6,15 @@ wandb:
   use: false
 defaults:
   - optimizer: default
-  - backbone: clip_b16_laion
+  - backbone: dinov3_vitb16
   - dataset: unreal_motion_capture
-  - probe: regressor
+  - probe: regressor # regressor | efficient_probing
   - _self_
 experiment_name: example_scenario
-experiment_model: clip_b16_laion
+experiment_model: dinov3_vitb16
 training:
   min_samples_per_object: 10
   eval_every_epochs: 1
   save_checkpoints: false
+  num_workers: 4
 output_dir: "results"

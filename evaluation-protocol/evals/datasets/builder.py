@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from hydra.utils import instantiate
 import torch
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import DataLoader, Sampler, Subset
 
 
 class _ModeBatchSampler(Sampler[list[int]]):
@@ -45,13 +45,37 @@ class _ModeBatchSampler(Sampler[list[int]]):
         return total
 
 
-def build_loader(cfg, split: str, batch_size: int, num_workers: int = 4):
-    dataset = instantiate(cfg, split=split)
+def build_loader(cfg, split: str, batch_size: int, num_workers: int = 4, **dataset_overrides):
+    dataset = build_dataset(cfg, split=split, **dataset_overrides)
     shuffle = split == "train"
     batch_sampler = _ModeBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     return DataLoader(
         dataset,
         batch_sampler=batch_sampler,
+        num_workers=num_workers,
+        drop_last=False,
+        pin_memory=True,
+    )
+
+
+def build_dataset(cfg, split: str, **overrides):
+    return instantiate(cfg, split=split, **overrides)
+
+
+def build_group_loader_from_dataset(
+    dataset,
+    sample_indices: list[int],
+    batch_size: int,
+    shuffle: bool = False,
+    num_workers: int = 0,
+):
+    active_positions = {sample_idx: position for position, sample_idx in enumerate(dataset.active_indices)}
+    positions = [active_positions[sample_idx] for sample_idx in sample_indices if sample_idx in active_positions]
+    subset = Subset(dataset, positions)
+    return DataLoader(
+        subset,
+        batch_size=batch_size,
+        shuffle=shuffle,
         num_workers=num_workers,
         drop_last=False,
         pin_memory=True,

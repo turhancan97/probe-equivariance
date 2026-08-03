@@ -1,0 +1,3 @@
+name: clip_large_laion
+pool: mean # mean | cls | patch
+image_mean: clip # imagenet | clip | custom

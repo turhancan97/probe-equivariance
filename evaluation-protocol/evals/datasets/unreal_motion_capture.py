@@ -59,6 +59,8 @@ class UnrealMotionCaptureTask(Dataset):
         split: str = "train",
         image_size: int = 224,
         image_mean: str = "imagenet",
+        mean: Optional[Sequence[float]] = None,
+        std: Optional[Sequence[float]] = None,
         split_ratio: float = 0.90,
         test_ratio: float = 0.00,
         environments: Optional[Sequence[str]] = None,
@@ -75,12 +77,13 @@ class UnrealMotionCaptureTask(Dataset):
         self.name = name
         self.seed = seed
 
-        if image_mean == "imagenet":
-            mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-        elif image_mean == "clip":
-            mean, std = [0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711]
-        else:
-            mean, std = [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
+        if mean is None or std is None:
+            if image_mean == "imagenet":
+                mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            elif image_mean == "clip":
+                mean, std = [0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711]
+            else:
+                mean, std = [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
 
         self.transform = T.Compose(
             [

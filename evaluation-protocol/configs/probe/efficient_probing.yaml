@@ -1,0 +1,7 @@
+_target_: evals.models.probe.EfficientProbingHead
+num_queries: 4
+num_heads: 1
+d_out: 2
+use_layernorm: true
+qkv_bias: false
+qk_scale: null

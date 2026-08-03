@@ -1,2 +1,3 @@
 name: clip_b16_laion
-pool: mean
+pool: patch # mean | cls | patch
+image_mean: clip # imagenet | clip | custom

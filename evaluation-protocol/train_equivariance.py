@@ -18,6 +18,7 @@ from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 try:
@@ -25,11 +26,25 @@ try:
 except ImportError:
     wandb = None
 
-from evals.datasets.builder import build_loader
+from evals.datasets.builder import build_dataset, build_group_loader_from_dataset, build_loader
 from evals.datasets.unreal_motion_capture import regression_dim
 from evals.models.backbone import load_backbone
 from evals.utils.optim import cosine_decay_linear_warmup
 from evals.utils.seed import set_random_seed
+
+
+EP_PROBE_TARGET = "evals.models.probe.EfficientProbingHead"
+
+
+def _instantiate_probe(cfg: DictConfig, feat_dim: int, output_dim: int):
+    """Instantiate cfg.probe, unwrapping Hydra's InstantiationException so config
+    validation errors (e.g. ValueError from EfficientProbingPool) propagate as-is."""
+    try:
+        return instantiate(cfg.probe, feat_dim=feat_dim, output_dim=output_dim)
+    except hydra.errors.InstantiationException as exc:
+        if exc.__cause__ is not None:
+            raise exc.__cause__ from exc
+        raise
 
 
 def _sanitize_name(name: str) -> str:
@@ -48,6 +63,19 @@ class FeatureRecord:
     feature: torch.Tensor
     target: torch.Tensor
     frame_index: int
+
+
+def is_efficient_probing_probe(probe_cfg: DictConfig) -> bool:
+    return str(probe_cfg.get("_target_", "")) == EP_PROBE_TARGET
+
+
+def validate_probe_backbone_compatibility(cfg: DictConfig) -> None:
+    uses_ep = is_efficient_probing_probe(cfg.probe)
+    pool = str(cfg.backbone.pool)
+    if uses_ep and pool != "patch":
+        raise ValueError("Efficient Probing requires backbone.pool='patch'.")
+    if not uses_ep and pool == "patch":
+        raise ValueError("backbone.pool='patch' is currently supported only with Efficient Probing.")
 
 
 def collect_split_features(
@@ -93,6 +121,34 @@ def stack_records(records: List[FeatureRecord]) -> Tuple[torch.Tensor, torch.Ten
     return features, targets
 
 
+def _sorted_group_sample_indices(dataset, split: str, key: Tuple[str, str, str]) -> List[int]:
+    return sorted(
+        dataset.group_indices_by_split[split].get(key, []),
+        key=lambda sample_idx: dataset.samples[sample_idx].frame_index,
+    )
+
+
+def build_group_loader(
+    dataset,
+    split: str,
+    key: Tuple[str, str, str],
+    batch_size: int,
+    shuffle: bool = False,
+    num_workers: int = 0,
+):
+    sample_indices = _sorted_group_sample_indices(dataset, split, key)
+    if not sample_indices:
+        return None, []
+    loader = build_group_loader_from_dataset(
+        dataset,
+        sample_indices,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+    )
+    return loader, sample_indices
+
+
 def compute_rmse(preds: torch.Tensor, targets: torch.Tensor) -> float:
     if preds.numel() == 0:
         return float("nan")
@@ -106,6 +162,41 @@ def evaluate_head(head, features: torch.Tensor, targets: torch.Tensor, device: t
     with torch.no_grad():
         preds = head(features.to(device))
         mse = torch.mean((preds - targets.to(device)) ** 2).item()
+    return mse, math.sqrt(mse) if mse >= 0 else float("nan")
+
+
+def predict_from_image_loader(
+    head,
+    model,
+    loader: DataLoader | None,
+    device: torch.device,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if loader is None:
+        return torch.empty(0), torch.empty(0)
+
+    preds_batches = []
+    target_batches = []
+    head.eval()
+    with torch.no_grad():
+        for batch in loader:
+            images = batch["image"].to(device, non_blocking=True)
+            targets = batch["target"].detach().cpu().contiguous()
+            feats = model(images)
+            preds = head(feats).detach().cpu().contiguous()
+            preds_batches.append(preds)
+            target_batches.append(targets)
+
+    if not preds_batches:
+        return torch.empty(0), torch.empty(0)
+
+    return torch.cat(preds_batches, dim=0), torch.cat(target_batches, dim=0)
+
+
+def evaluate_head_on_image_loader(head, model, loader: DataLoader | None, device: torch.device) -> Tuple[float, float]:
+    preds, targets = predict_from_image_loader(head, model, loader, device)
+    if preds.numel() == 0:
+        return float("nan"), float("nan")
+    mse = torch.mean((preds - targets) ** 2).item()
     return mse, math.sqrt(mse) if mse >= 0 else float("nan")
 
 
@@ -145,7 +236,8 @@ def train_probe(
 
     indices = torch.arange(train_features.size(0))
     val_mse_epoch = float("nan")
-    for epoch in range(cfg.optimizer.n_epochs):
+    epoch_bar = tqdm(range(cfg.optimizer.n_epochs), desc=f"Epochs[{log_prefix}]", leave=False)
+    for epoch in epoch_bar:
         head.train()
         perm = indices[torch.randperm(indices.size(0))]
         epoch_loss, count = 0.0, 0
@@ -165,6 +257,7 @@ def train_probe(
         if cfg.training.eval_every_epochs > 0 and epoch % cfg.training.eval_every_epochs == 0:
             val_mse_epoch, _ = evaluate_head(head, val_features, val_targets, device)
 
+        epoch_bar.set_postfix(train_mse=train_mse_epoch, val_mse=val_mse_epoch)
         if log_to_wandb:
             wandb.log({f"train_mse_{log_prefix}": train_mse_epoch, f"val_mse_{log_prefix}": val_mse_epoch})
 
@@ -174,6 +267,81 @@ def train_probe(
     train_rmse = compute_rmse(train_preds, train_targets)
     train_mse = float(torch.mean((train_preds - train_targets) ** 2).item())
     val_mse, val_rmse = evaluate_head(head, val_features, val_targets, device)
+
+    return {
+        "train_mse": train_mse,
+        "train_rmse": train_rmse,
+        "val_mse": val_mse,
+        "val_rmse": val_rmse,
+        "head": head,
+    }
+
+
+def train_probe_on_image_loaders(
+    head,
+    model,
+    train_loader: DataLoader | None,
+    val_loader: DataLoader | None,
+    device: torch.device,
+    cfg: DictConfig,
+    log_prefix: str,
+    log_to_wandb: bool,
+) -> Dict[str, float]:
+    train_dataset_size = len(train_loader.dataset) if train_loader is not None else 0
+    if train_dataset_size == 0:
+        return {
+            "train_mse": float("nan"),
+            "train_rmse": float("nan"),
+            "val_mse": float("nan"),
+            "val_rmse": float("nan"),
+            "head": head,
+        }
+
+    head = head.to(device)
+    optimizer = torch.optim.AdamW(
+        head.parameters(), lr=cfg.optimizer.probe_lr, weight_decay=cfg.optimizer.weight_decay
+    )
+
+    steps_per_epoch = max(1, math.ceil(train_dataset_size / max(1, cfg.batch_size)))
+    total_steps = cfg.optimizer.n_epochs * steps_per_epoch
+    warmup_steps = max(1, int(cfg.optimizer.warmup_epochs * steps_per_epoch))
+    scheduler = LambdaLR(
+        optimizer,
+        lr_lambda=lambda step: cosine_decay_linear_warmup(step, total_steps, warmup_steps),
+    )
+    loss_fn = torch.nn.MSELoss()
+
+    val_mse_epoch = float("nan")
+    epoch_bar = tqdm(range(cfg.optimizer.n_epochs), desc=f"Epochs[{log_prefix}]", leave=False)
+    for epoch in epoch_bar:
+        head.train()
+        epoch_loss, count = 0.0, 0
+        for batch in tqdm(train_loader, desc="Batches", leave=False):
+            images = batch["image"].to(device, non_blocking=True)
+            targets = batch["target"].to(device, non_blocking=True)
+            with torch.no_grad():
+                feats = model(images)
+            preds = head(feats)
+            loss = loss_fn(preds, targets)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            epoch_loss += loss.item() * targets.size(0)
+            count += targets.size(0)
+
+        train_mse_epoch = epoch_loss / max(1, count)
+        if cfg.training.eval_every_epochs > 0 and epoch % cfg.training.eval_every_epochs == 0:
+            val_mse_epoch, _ = evaluate_head_on_image_loader(head, model, val_loader, device)
+
+        epoch_bar.set_postfix(train_mse=train_mse_epoch, val_mse=val_mse_epoch)
+        if log_to_wandb:
+            wandb.log({f"train_mse_{log_prefix}": train_mse_epoch, f"val_mse_{log_prefix}": val_mse_epoch})
+
+    train_preds, train_targets = predict_from_image_loader(head, model, train_loader, device)
+    train_rmse = compute_rmse(train_preds, train_targets)
+    train_mse = float(torch.mean((train_preds - train_targets) ** 2).item()) if train_preds.numel() else float("nan")
+    val_mse, val_rmse = evaluate_head_on_image_loader(head, model, val_loader, device)
 
     return {
         "train_mse": train_mse,
@@ -211,9 +379,11 @@ def save_probe_checkpoint(
 
 
 def run_equivariance(cfg: DictConfig) -> None:
+    validate_probe_backbone_compatibility(cfg)
     set_random_seed(cfg.system.random_seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_wandb = bool(cfg.wandb.use)
+    uses_ep = is_efficient_probing_probe(cfg.probe)
 
     exp_path = Path(__file__).parent / f"equivariance_exps/{datetime.now().strftime('%d%m%Y-%H%M')}"
     exp_path.mkdir(parents=True, exist_ok=True)
@@ -240,50 +410,246 @@ def run_equivariance(cfg: DictConfig) -> None:
             group=f"seed:{cfg.system.random_seed}",
         )
 
-    train_loader = build_loader(cfg.dataset, "train", cfg.batch_size)
-    val_loader = build_loader(cfg.dataset, "valid", cfg.batch_size)
-    test_loader = build_loader(cfg.dataset, "test", cfg.batch_size) if cfg.dataset.test_ratio > 0 else None
-
-    model, feat_dim = load_backbone(cfg.backbone.name, pool=cfg.backbone.pool)
+    model, feat_dim = load_backbone(
+        cfg.backbone.name,
+        pool=cfg.backbone.pool,
+        image_mean=cfg.backbone.get("image_mean"),
+        custom_mean=cfg.backbone.get("custom_mean"),
+        custom_std=cfg.backbone.get("custom_std"),
+    )
     model = model.to(device)
+    norm_overrides = {}
+    if getattr(model, "normalize_mean", None) is not None and getattr(model, "normalize_std", None) is not None:
+        norm_overrides = {"mean": model.normalize_mean, "std": model.normalize_std}
 
-    train_groups = collect_split_features(train_loader, model, device)
-    val_groups = collect_split_features(val_loader, model, device)
-    test_groups = collect_split_features(test_loader, model, device) if test_loader else {}
+    if uses_ep:
+        train_dataset = build_dataset(cfg.dataset, "train", **norm_overrides)
+        val_dataset = build_dataset(cfg.dataset, "valid", **norm_overrides)
+        test_dataset = build_dataset(cfg.dataset, "test", **norm_overrides) if cfg.dataset.test_ratio > 0 else None
+        keys = sorted(train_dataset.group_indices_by_split["train"].keys())
+        backbone_name = model.checkpoint_name
+        head_name = cfg.probe.get("_target_", "probe")
+        pool_name = cfg.backbone.get("pool", "")
+        results = []
+        checkpoint_manifest = []
 
-    backbone_name = model.checkpoint_name
-    head_name = cfg.probe.get("_target_", "probe")
-
-    results = []
-    checkpoint_manifest = []
-    keys = sorted(train_groups.keys())
-
-    for key in tqdm(keys, desc="Groups"):
-        environment, mode, object_name = key
-        train_records = train_groups.get(key, [])
-        val_records = val_groups.get(key, [])
-        test_records = test_groups.get(key, [])
-        log_prefix = "_".join([
-            _sanitize_name(environment),
-            _sanitize_name(mode),
-            _sanitize_name(object_name),
-        ])
-
-        if len(train_records) < cfg.training.min_samples_per_object:
-            logger.info(
-                f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_records)})"
+        num_workers = cfg.training.get("num_workers", 0)
+        for key in tqdm(keys, desc="Groups"):
+            environment, mode, object_name = key
+            train_loader, train_sample_indices = build_group_loader(
+                train_dataset, "train", key, cfg.batch_size, shuffle=True, num_workers=num_workers
             )
+            val_loader, val_sample_indices = build_group_loader(
+                val_dataset, "valid", key, cfg.batch_size, shuffle=False, num_workers=num_workers
+            )
+            test_loader, test_sample_indices = (
+                build_group_loader(
+                    test_dataset, "test", key, cfg.batch_size, shuffle=False, num_workers=num_workers
+                )
+                if test_dataset is not None
+                else (None, [])
+            )
+            log_prefix = "_".join([
+                _sanitize_name(environment),
+                _sanitize_name(mode),
+                _sanitize_name(object_name),
+            ])
+
+            if len(train_sample_indices) < cfg.training.min_samples_per_object:
+                logger.info(
+                    f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_sample_indices)})"
+                )
+                results.append(
+                    {
+                        "environment": environment,
+                        "mode": mode,
+                        "object": object_name,
+                        "train_mse": float("nan"),
+                        "val_mse": float("nan"),
+                        "test_mse": float("nan"),
+                        "train_rmse": float("nan"),
+                        "val_rmse": float("nan"),
+                        "test_rmse": float("nan"),
+                        "num_train": len(train_sample_indices),
+                        "num_val": len(val_sample_indices),
+                        "num_test": len(test_sample_indices),
+                    }
+                )
+                checkpoint_manifest.append(
+                    {
+                        "environment": environment,
+                        "mode": mode,
+                        "object": object_name,
+                        "checkpoint_path": None,
+                        "num_train": len(train_sample_indices),
+                        "num_val": len(val_sample_indices),
+                        "num_test": len(test_sample_indices),
+                    }
+                )
+                continue
+
+            output_dim = regression_dim(mode)
+            head = _instantiate_probe(cfg, feat_dim, output_dim)
+            metrics = train_probe_on_image_loaders(
+                head,
+                model,
+                train_loader,
+                val_loader,
+                device,
+                cfg,
+                log_prefix,
+                use_wandb,
+            )
+            trained_head = metrics.pop("head")
+            test_mse, test_rmse = evaluate_head_on_image_loader(trained_head, model, test_loader, device)
+
+            checkpoint_relpath = None
+            if save_checkpoints:
+                checkpoint_path = checkpoint_dir / checkpoint_name(environment, mode, object_name)
+                save_probe_checkpoint(
+                    checkpoint_path,
+                    trained_head,
+                    feat_dim,
+                    output_dim,
+                    environment,
+                    mode,
+                    object_name,
+                    cfg,
+                )
+                checkpoint_relpath = checkpoint_path.relative_to(result_dir).as_posix()
+
             results.append(
                 {
                     "environment": environment,
                     "mode": mode,
                     "object": object_name,
-                    "train_mse": float("nan"),
-                    "val_mse": float("nan"),
-                    "test_mse": float("nan"),
-                    "train_rmse": float("nan"),
-                    "val_rmse": float("nan"),
-                    "test_rmse": float("nan"),
+                    "train_mse": metrics["train_mse"],
+                    "val_mse": metrics["val_mse"],
+                    "test_mse": test_mse,
+                    "train_rmse": metrics["train_rmse"],
+                    "val_rmse": metrics["val_rmse"],
+                    "test_rmse": test_rmse,
+                    "num_train": len(train_sample_indices),
+                    "num_val": len(val_sample_indices),
+                    "num_test": len(test_sample_indices),
+                }
+            )
+            checkpoint_manifest.append(
+                {
+                    "environment": environment,
+                    "mode": mode,
+                    "object": object_name,
+                    "checkpoint_path": checkpoint_relpath,
+                    "num_train": len(train_sample_indices),
+                    "num_val": len(val_sample_indices),
+                    "num_test": len(test_sample_indices),
+                }
+            )
+    else:
+        num_workers = cfg.training.get("num_workers", 4)
+        train_loader = build_loader(cfg.dataset, "train", cfg.batch_size, num_workers=num_workers, **norm_overrides)
+        val_loader = build_loader(cfg.dataset, "valid", cfg.batch_size, num_workers=num_workers, **norm_overrides)
+        test_loader = (
+            build_loader(cfg.dataset, "test", cfg.batch_size, num_workers=num_workers, **norm_overrides)
+            if cfg.dataset.test_ratio > 0
+            else None
+        )
+
+        train_groups = collect_split_features(train_loader, model, device)
+        val_groups = collect_split_features(val_loader, model, device)
+        test_groups = collect_split_features(test_loader, model, device) if test_loader else {}
+
+        backbone_name = model.checkpoint_name
+        head_name = cfg.probe.get("_target_", "probe")
+        pool_name = cfg.backbone.get("pool", "")
+
+        results = []
+        checkpoint_manifest = []
+        keys = sorted(train_groups.keys())
+
+        for key in tqdm(keys, desc="Groups"):
+            environment, mode, object_name = key
+            train_records = train_groups.get(key, [])
+            val_records = val_groups.get(key, [])
+            test_records = test_groups.get(key, [])
+            log_prefix = "_".join([
+                _sanitize_name(environment),
+                _sanitize_name(mode),
+                _sanitize_name(object_name),
+            ])
+
+            if len(train_records) < cfg.training.min_samples_per_object:
+                logger.info(
+                    f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_records)})"
+                )
+                results.append(
+                    {
+                        "environment": environment,
+                        "mode": mode,
+                        "object": object_name,
+                        "train_mse": float("nan"),
+                        "val_mse": float("nan"),
+                        "test_mse": float("nan"),
+                        "train_rmse": float("nan"),
+                        "val_rmse": float("nan"),
+                        "test_rmse": float("nan"),
+                        "num_train": len(train_records),
+                        "num_val": len(val_records),
+                        "num_test": len(test_records),
+                    }
+                )
+                checkpoint_manifest.append(
+                    {
+                        "environment": environment,
+                        "mode": mode,
+                        "object": object_name,
+                        "checkpoint_path": None,
+                        "num_train": len(train_records),
+                        "num_val": len(val_records),
+                        "num_test": len(test_records),
+                    }
+                )
+                continue
+
+            train_features, train_targets = stack_records(train_records)
+            val_features, val_targets = stack_records(val_records)
+            test_features, test_targets = stack_records(test_records)
+
+            output_dim = regression_dim(mode)
+            head = _instantiate_probe(cfg, feat_dim, output_dim)
+
+            metrics = train_probe(
+                head, train_features, train_targets, val_features, val_targets, device, cfg, log_prefix, use_wandb
+            )
+            trained_head = metrics.pop("head")
+            test_mse, test_rmse = evaluate_head(trained_head, test_features, test_targets, device)
+
+            checkpoint_relpath = None
+            if save_checkpoints:
+                checkpoint_path = checkpoint_dir / checkpoint_name(environment, mode, object_name)
+                save_probe_checkpoint(
+                    checkpoint_path,
+                    trained_head,
+                    feat_dim,
+                    output_dim,
+                    environment,
+                    mode,
+                    object_name,
+                    cfg,
+                )
+                checkpoint_relpath = checkpoint_path.relative_to(result_dir).as_posix()
+
+            results.append(
+                {
+                    "environment": environment,
+                    "mode": mode,
+                    "object": object_name,
+                    "train_mse": metrics["train_mse"],
+                    "val_mse": metrics["val_mse"],
+                    "test_mse": test_mse,
+                    "train_rmse": metrics["train_rmse"],
+                    "val_rmse": metrics["val_rmse"],
+                    "test_rmse": test_rmse,
                     "num_train": len(train_records),
                     "num_val": len(val_records),
                     "num_test": len(test_records),
@@ -294,69 +660,12 @@ def run_equivariance(cfg: DictConfig) -> None:
                     "environment": environment,
                     "mode": mode,
                     "object": object_name,
-                    "checkpoint_path": None,
+                    "checkpoint_path": checkpoint_relpath,
                     "num_train": len(train_records),
                     "num_val": len(val_records),
                     "num_test": len(test_records),
                 }
             )
-            continue
-
-        train_features, train_targets = stack_records(train_records)
-        val_features, val_targets = stack_records(val_records)
-        test_features, test_targets = stack_records(test_records)
-
-        output_dim = regression_dim(mode)
-        head = instantiate(cfg.probe, feat_dim=feat_dim, output_dim=output_dim)
-
-        metrics = train_probe(
-            head, train_features, train_targets, val_features, val_targets, device, cfg, log_prefix, use_wandb
-        )
-        trained_head = metrics.pop("head")
-        test_mse, test_rmse = evaluate_head(trained_head, test_features, test_targets, device)
-
-        checkpoint_relpath = None
-        if save_checkpoints:
-            checkpoint_path = checkpoint_dir / checkpoint_name(environment, mode, object_name)
-            save_probe_checkpoint(
-                checkpoint_path,
-                trained_head,
-                feat_dim,
-                output_dim,
-                environment,
-                mode,
-                object_name,
-                cfg,
-            )
-            checkpoint_relpath = checkpoint_path.relative_to(result_dir).as_posix()
-
-        results.append(
-            {
-                "environment": environment,
-                "mode": mode,
-                "object": object_name,
-                "train_mse": metrics["train_mse"],
-                "val_mse": metrics["val_mse"],
-                "test_mse": test_mse,
-                "train_rmse": metrics["train_rmse"],
-                "val_rmse": metrics["val_rmse"],
-                "test_rmse": test_rmse,
-                "num_train": len(train_records),
-                "num_val": len(val_records),
-                "num_test": len(test_records),
-            }
-        )
-        checkpoint_manifest.append(
-            {
-                "environment": environment,
-                "mode": mode,
-                "object": object_name,
-                "checkpoint_path": checkpoint_relpath,
-                "num_train": len(train_records),
-                "num_val": len(val_records),
-                "num_test": len(test_records),
-            }
-        )
 
     timestamp = datetime.now().strftime("%d%m%Y-%H%M")
 
@@ -365,13 +674,13 @@ def run_equivariance(cfg: DictConfig) -> None:
     with object_csv.open("a") as f:
         if new_file:
             f.write(
-                "Timestamp,Experiment,Environment,Mode,Object,Train RMSE,Val RMSE,Test RMSE,Num Train,Num Val,Num Test,Backbone,Head\n"
+                "Timestamp,Experiment,Environment,Mode,Object,Train RMSE,Val RMSE,Test RMSE,Num Train,Num Val,Num Test,Backbone,Pool,Head\n"
             )
         for row in results:
             f.write(
                 f"{timestamp},{cfg.experiment_name},{row['environment']},{row['mode']},{row['object']},"
                 f"{row['train_rmse']},{row['val_rmse']},{row['test_rmse']},"
-                f"{row['num_train']},{row['num_val']},{row['num_test']},{backbone_name},{head_name}\n"
+                f"{row['num_train']},{row['num_val']},{row['num_test']},{backbone_name},{pool_name},{head_name}\n"
             )
 
     environments = sorted({r["environment"] for r in results})
@@ -380,12 +689,12 @@ def run_equivariance(cfg: DictConfig) -> None:
     new_summary = not summary_csv.exists()
     with summary_csv.open("a") as f:
         if new_summary:
-            header = ["Timestamp", "Experiment", "Environment", "Backbone", "Head"]
+            header = ["Timestamp", "Experiment", "Environment", "Backbone", "Pool", "Head"]
             header += [f"Train RMSE {m}" for m in modes] + [f"Val RMSE {m}" for m in modes] + [f"Test RMSE {m}" for m in modes]
             f.write(",".join(header) + "\n")
 
         for environment in environments:
-            row_values = [timestamp, cfg.experiment_name, environment, backbone_name, head_name]
+            row_values = [timestamp, cfg.experiment_name, environment, backbone_name, pool_name, head_name]
             for metric_key in ("train_rmse", "val_rmse", "test_rmse"):
                 for mode in modes:
                     vals = [r[metric_key] for r in results if r["environment"] == environment and r["mode"] == mode]
@@ -397,6 +706,7 @@ def run_equivariance(cfg: DictConfig) -> None:
         "timestamp": timestamp,
         "experiment_name": cfg.experiment_name,
         "backbone": backbone_name,
+        "pool": pool_name,
         "head": head_name,
         "save_checkpoints": save_checkpoints,
         "groups": checkpoint_manifest,
