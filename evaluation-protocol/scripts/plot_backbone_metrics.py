@@ -52,6 +52,24 @@ def _mean(values: list[float]) -> float:
     return float(np.mean(finite)) if finite else float("nan")
 
 
+def _metric_stats(
+    backbone_values: dict[str, dict[str, dict[str, list[float]]]],
+    backbone: str,
+    metric: str,
+) -> tuple[float, float]:
+    """Return mean and sample standard deviation across seed means."""
+    per_seed = backbone_values[backbone].get(metric, {})
+    seed_means = [
+        seed_mean
+        for values in per_seed.values()
+        if math.isfinite(seed_mean := _mean(values))
+    ]
+    if not seed_means:
+        return float("nan"), float("nan")
+    deviation = float(np.std(seed_means, ddof=1)) if len(seed_means) > 1 else 0.0
+    return float(np.mean(seed_means)), deviation
+
+
 def _backbone_family(backbone: str) -> str:
     normalized = backbone.lower().replace("-", "_")
     for prefix in FAMILY_PREFIXES:
@@ -89,35 +107,43 @@ def load_metrics(metrics_csv: str | Path) -> list[dict[str, str]]:
         raise FileNotFoundError(f"Combined metrics CSV does not exist: {metrics_csv}")
     with metrics_csv.open("r", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        required = {"environment", "mode", "backbone", "pool", *METRIC_LABELS}
+        required = {"environment", "mode", "backbone", "pool", "seed", *METRIC_LABELS}
         missing = required - set(reader.fieldnames or [])
         if missing:
             raise ValueError(f"Missing expected columns in {metrics_csv}: {sorted(missing)}")
-        return list(reader)
+        rows = list(reader)
+        missing_seed = [index for index, row in enumerate(rows, start=2) if not row["seed"]]
+        if missing_seed:
+            raise ValueError(
+                f"Missing seed values in {metrics_csv} on CSV rows {missing_seed[:5]}"
+            )
+        return rows
 
 
 def _group_values(
     rows: list[dict[str, str]],
     metric_names: list[str],
 ) -> dict[str, dict[str, list[float]]]:
-    values: dict[str, dict[str, list[float]]] = defaultdict(
-        lambda: defaultdict(list)
+    values: dict[str, dict[str, dict[str, list[float]]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(list))
     )
     for row in rows:
         for metric in metric_names:
-            values[row["backbone"]][metric].append(_finite_float(row[metric]))
+            values[row["backbone"]][metric][row["seed"]].append(
+                _finite_float(row[metric])
+            )
     return values
 
 
 def _rank_backbones(
-    backbone_values: dict[str, dict[str, list[float]]],
+    backbone_values: dict[str, dict[str, dict[str, list[float]]]],
     order_by: str,
 ) -> list[str]:
     fallback = "test_rmse" if order_by == "val_rmse" else "val_rmse"
 
     def rank_key(backbone: str) -> tuple[float, float, str]:
-        primary = _mean(backbone_values[backbone].get(order_by, []))
-        secondary = _mean(backbone_values[backbone].get(fallback, []))
+        primary, _ = _metric_stats(backbone_values, backbone, order_by)
+        secondary, _ = _metric_stats(backbone_values, backbone, fallback)
         return (
             primary if math.isfinite(primary) else float("inf"),
             secondary if math.isfinite(secondary) else float("inf"),
@@ -129,16 +155,28 @@ def _rank_backbones(
 
 def _draw_bars(
     ax: plt.Axes,
-    backbone_values: dict[str, dict[str, list[float]]],
+    backbone_values: dict[str, dict[str, dict[str, list[float]]]],
     backbones: list[str],
     metric_names: list[str],
 ) -> None:
     x = np.arange(len(backbones), dtype=float)
     width = 0.8 / len(metric_names)
     for metric_index, metric in enumerate(metric_names):
-        values = [_mean(backbone_values[backbone].get(metric, [])) for backbone in backbones]
+        means_and_stds = [
+            _metric_stats(backbone_values, backbone, metric) for backbone in backbones
+        ]
+        values = [mean for mean, _ in means_and_stds]
+        deviations = [std for _, std in means_and_stds]
         offsets = x + (metric_index - (len(metric_names) - 1) / 2.0) * width
-        ax.bar(offsets, values, width=width, label=METRIC_LABELS[metric])
+        ax.bar(
+            offsets,
+            values,
+            yerr=deviations,
+            width=width,
+            capsize=3,
+            error_kw={"elinewidth": 1.1},
+            label=METRIC_LABELS[metric],
+        )
     ax.set_xticks(x)
     ax.set_xticklabels(backbones, rotation=45, ha="right")
     ax.grid(axis="y", alpha=0.25)

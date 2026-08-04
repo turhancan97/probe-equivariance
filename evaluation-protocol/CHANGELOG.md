@@ -19,6 +19,8 @@ Added separate capped-array launchers plus combined metrics aggregation and back
 - added `aggregate_backbone_metrics.py` for one combined object-level metrics CSV
 - updated `plot_backbone_metrics.py` to plot validation/test RMSE only, rank backbones best-to-worst, add size/family comparison views, and separate every pool mode
 - included `pool` in aggregation deduplication keys so mean/cls/patch histories remain independent
+- added a `Seed` column to training `object_metrics.csv` output so repeated runs can reuse one experiment name
+- added seed-aware aggregation and validation/test RMSE standard-deviation error bars computed across seeds
 
 ### What Changed
 

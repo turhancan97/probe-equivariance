@@ -127,7 +127,7 @@ conda run -n dinov3 python scripts/plot_backbone_metrics.py \
   --output-dir results/backbone_comparisons
 ```
 
-The plots contain validation and test RMSE only. Backbones are ordered best-to-worst by ascending validation RMSE, with test RMSE as the tie-breaker. If an environment/mode contains multiple objects, the plotted value is the mean across objects. The output contains:
+The plots contain validation and test RMSE only. Bars show the mean across seeds, with standard-deviation error bars. Each training run writes its `system.random_seed` to the `Seed` column in `object_metrics.csv`; the aggregator preserves that value. For each seed, object metrics are averaged first, so objects do not count as independent seeds. Legacy rows without `Seed` fall back to `run_config.yaml`. Backbones are ordered best-to-worst by ascending validation RMSE, with test RMSE as the tie-breaker. If an environment/mode contains multiple objects, the plotted value is the mean across objects. The output contains:
 
 - `<environment>__<mode>__<pool>.png`: all backbones in one ranked plot
 - `<environment>__<mode>__<pool>__by_size.png`: three columns for Small, Base, and Large backbones

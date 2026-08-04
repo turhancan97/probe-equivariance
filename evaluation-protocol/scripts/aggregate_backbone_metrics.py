@@ -60,7 +60,7 @@ def _normalize_row(
     return {
         "result_dir": str(result_dir),
         "timestamp": row.get("Timestamp", ""),
-        "seed": metadata.get("seed", ""),
+        "seed": row.get("Seed", "") or metadata.get("seed", ""),
         "experiment": row.get("Experiment", ""),
         "environment": row.get("Environment", ""),
         "mode": row.get("Mode", ""),

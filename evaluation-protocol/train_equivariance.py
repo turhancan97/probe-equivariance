@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import csv
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -34,6 +35,43 @@ from evals.utils.seed import set_random_seed
 
 
 EP_PROBE_TARGET = "evals.models.probe.EfficientProbingHead"
+
+OBJECT_METRIC_FIELDS = [
+    "Timestamp",
+    "Seed",
+    "Experiment",
+    "Environment",
+    "Mode",
+    "Object",
+    "Train RMSE",
+    "Val RMSE",
+    "Test RMSE",
+    "Num Train",
+    "Num Val",
+    "Num Test",
+    "Backbone",
+    "Pool",
+    "Head",
+]
+
+
+def _ensure_seed_column(object_csv: Path, seed: int) -> None:
+    """Migrate legacy object metrics before appending seed-aware rows."""
+    if not object_csv.exists():
+        return
+
+    with object_csv.open("r", newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if "Seed" in (reader.fieldnames or []):
+            return
+        legacy_rows = list(reader)
+
+    with object_csv.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=OBJECT_METRIC_FIELDS)
+        writer.writeheader()
+        for row in legacy_rows:
+            row["Seed"] = str(seed)
+            writer.writerow({field: row.get(field, "") for field in OBJECT_METRIC_FIELDS})
 
 
 def _instantiate_probe(cfg: DictConfig, feat_dim: int, output_dim: int):
@@ -668,19 +706,33 @@ def run_equivariance(cfg: DictConfig) -> None:
             )
 
     timestamp = datetime.now().strftime("%d%m%Y-%H%M")
+    seed = int(cfg.system.random_seed)
 
     object_csv = result_dir / "object_metrics.csv"
-    new_file = not object_csv.exists()
-    with object_csv.open("a") as f:
-        if new_file:
-            f.write(
-                "Timestamp,Experiment,Environment,Mode,Object,Train RMSE,Val RMSE,Test RMSE,Num Train,Num Val,Num Test,Backbone,Pool,Head\n"
-            )
+    _ensure_seed_column(object_csv, seed)
+    with object_csv.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=OBJECT_METRIC_FIELDS)
+        if object_csv.stat().st_size == 0:
+            writer.writeheader()
         for row in results:
-            f.write(
-                f"{timestamp},{cfg.experiment_name},{row['environment']},{row['mode']},{row['object']},"
-                f"{row['train_rmse']},{row['val_rmse']},{row['test_rmse']},"
-                f"{row['num_train']},{row['num_val']},{row['num_test']},{backbone_name},{pool_name},{head_name}\n"
+            writer.writerow(
+                {
+                    "Timestamp": timestamp,
+                    "Seed": seed,
+                    "Experiment": cfg.experiment_name,
+                    "Environment": row["environment"],
+                    "Mode": row["mode"],
+                    "Object": row["object"],
+                    "Train RMSE": row["train_rmse"],
+                    "Val RMSE": row["val_rmse"],
+                    "Test RMSE": row["test_rmse"],
+                    "Num Train": row["num_train"],
+                    "Num Val": row["num_val"],
+                    "Num Test": row["num_test"],
+                    "Backbone": backbone_name,
+                    "Pool": pool_name,
+                    "Head": head_name,
+                }
             )
 
     environments = sorted({r["environment"] for r in results})

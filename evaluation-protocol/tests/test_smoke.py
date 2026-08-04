@@ -167,6 +167,8 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
 
         with mock.patch("train_equivariance.load_backbone", return_value=(_DummyBackbone(), 8)):
             run_equivariance(cfg)
+            cfg.system.random_seed = 9
+            run_equivariance(cfg)
         with mock.patch("visualize_equivariance.load_backbone", return_value=(_DummyBackbone(), 8)):
             run_visualization(vis_cfg)
 
@@ -178,6 +180,9 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
 
         self.assertIn("camera_line", object_metrics)
         self.assertIn("camera_orbit", object_metrics)
+        self.assertIn("Timestamp,Seed,Experiment", object_metrics)
+        self.assertIn(",8,smoke_multi_mode,", object_metrics)
+        self.assertIn(",9,smoke_multi_mode,", object_metrics)
         self.assertIn("Train RMSE camera_line", mode_summary)
         self.assertIn("Train RMSE camera_orbit", mode_summary)
         self.assertTrue(checkpoint_manifest["save_checkpoints"])

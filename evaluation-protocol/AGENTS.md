@@ -37,7 +37,7 @@ Recent validated state:
 - the Efficient Probing path is implemented and has been reported as passing in the local `dinov3` environment
 - visualization supports both pooled-feature probes and Efficient Probing checkpoints
 - `visualize_representations.py` supports per-frame CLS or patch-mean representations with PCA, t-SNE, or optional UMAP reduction
-- `scripts/aggregate_backbone_metrics.py` combines per-run object metrics into one normalized CSV, and `scripts/plot_backbone_metrics.py` creates ranked all-backbone, size-section, and family-section plots per environment/mode/pool using validation/test RMSE
+- `scripts/aggregate_backbone_metrics.py` combines per-run object metrics into one normalized CSV including `seed`, and `scripts/plot_backbone_metrics.py` creates ranked all-backbone, size-section, and family-section plots per environment/mode/pool using validation/test RMSE with seed standard-deviation bars
 - `scripts/launch_train_equivariance_parallel.sh`, `scripts/launch_visualize_equivariance_parallel.sh`, and `scripts/launch_visualize_representations_parallel.sh` submit capped arrays over all backbone configs by default and support repeated `--backbone NAME` selection
 - `README.md` documents installation, training, prediction visualization, representation visualization, pooling modes, and Efficient Probing
 - smoke tests exist in `tests/test_smoke.py` and `tests/test_representation_visualization.py`
