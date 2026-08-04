@@ -176,6 +176,11 @@ def run_visualization(cfg: DictConfig) -> None:
         image_mean=run_cfg.backbone.get("image_mean"),
         custom_mean=run_cfg.backbone.get("custom_mean"),
         custom_std=run_cfg.backbone.get("custom_std"),
+        img_size=(
+            None
+            if run_cfg.dataset.get("image_size") is None
+            else int(run_cfg.dataset.image_size)
+        ),
     )
     model = model.to(device)
     norm_overrides = {}

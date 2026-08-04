@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader, Dataset
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from evals.models.backbone import load_backbone
+from evals.models.backbone import get_model_input_size, load_backbone
 
 
 REPRESENTATION_TO_POOL = {
@@ -119,24 +119,7 @@ def representation_pool(representation: str) -> str:
 
 
 def _model_input_size(model: Any) -> int:
-    pretrained_cfg = getattr(getattr(model, "model", None), "pretrained_cfg", None) or {}
-    input_size = (
-        pretrained_cfg.get("input_size")
-        if isinstance(pretrained_cfg, dict)
-        else getattr(pretrained_cfg, "input_size", None)
-    )
-    if input_size is None:
-        default_cfg = getattr(getattr(model, "model", None), "default_cfg", None) or {}
-        input_size = (
-            default_cfg.get("input_size")
-            if isinstance(default_cfg, dict)
-            else getattr(default_cfg, "input_size", None)
-        )
-    if input_size is None:
-        return 224
-    if isinstance(input_size, int):
-        return input_size
-    return int(input_size[-1])
+    return get_model_input_size(getattr(model, "model", model))
 
 
 def _adaptive_tsne_perplexity(num_samples: int) -> float:
@@ -339,6 +322,7 @@ def run_representation_visualization(cfg: DictConfig) -> Path:
         image_mean=cfg.backbone.get("image_mean"),
         custom_mean=cfg.backbone.get("custom_mean"),
         custom_std=cfg.backbone.get("custom_std"),
+        img_size=None if cfg.image_size is None else int(cfg.image_size),
     )
     model = model.to(device)
     image_size = cfg.image_size

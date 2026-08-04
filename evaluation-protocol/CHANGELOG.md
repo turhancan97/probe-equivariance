@@ -21,6 +21,8 @@ Added separate capped-array launchers plus combined metrics aggregation and back
 - included `pool` in aggregation deduplication keys so mean/cls/patch histories remain independent
 - added a `Seed` column to training `object_metrics.csv` output so repeated runs can reuse one experiment name
 - added seed-aware aggregation and validation/test RMSE standard-deviation error bars computed across seeds
+- added common image-size support: `dataset.image_size=N` is passed to both dataset preprocessing and `timm.create_model(img_size=N)`
+- changed the training dataset default to automatic backbone-native resolution and recorded the resolved size in `run_config.yaml`
 
 ### What Changed
 

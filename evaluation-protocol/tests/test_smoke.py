@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from omegaconf import OmegaConf
@@ -77,6 +78,7 @@ class _DummyRegistryTimmModel(nn.Module):
         super().__init__()
         self.num_features = 4
         self.num_prefix_tokens = 1
+        self.patch_embed = SimpleNamespace(img_size=(224, 224))
         self.pretrained_cfg = {"mean": mean, "std": std}
 
     def forward_features(self, images: torch.Tensor) -> torch.Tensor:
@@ -157,6 +159,16 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
                 self.assertEqual(model.normalize_mean, [0.1, 0.2, 0.3])
                 self.assertEqual(model.normalize_std, [0.4, 0.5, 0.6])
 
+    def test_backbone_common_image_size_is_forwarded_to_timm(self):
+        with mock.patch(
+            "evals.models.backbone._create_model_with_fallbacks",
+            return_value=(_DummyRegistryTimmModel(), "dummy_model"),
+        ) as mocked_create:
+            model = FrozenBackbone("dummy_model", pool="mean", img_size=224)
+
+        mocked_create.assert_called_once_with("dummy_model", img_size=224)
+        self.assertEqual(model.input_size, 224)
+
     def test_run_equivariance_and_visualization_smoke(self):
         cfg = self._build_train_cfg(
             experiment_name="smoke_multi_mode",
@@ -165,10 +177,11 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
         )
         vis_cfg = self._build_vis_cfg("smoke_multi_mode")
 
-        with mock.patch("train_equivariance.load_backbone", return_value=(_DummyBackbone(), 8)):
+        with mock.patch("train_equivariance.load_backbone", return_value=(_DummyBackbone(), 8)) as load_mock:
             run_equivariance(cfg)
             cfg.system.random_seed = 9
             run_equivariance(cfg)
+        self.assertEqual(load_mock.call_args.kwargs["img_size"], 32)
         with mock.patch("visualize_equivariance.load_backbone", return_value=(_DummyBackbone(), 8)):
             run_visualization(vis_cfg)
 

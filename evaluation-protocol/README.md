@@ -96,7 +96,8 @@ conda run -n dinov3 python train_equivariance.py \
 Important notes:
 
 - `training.save_checkpoints=true` is required if you want to visualize predictions later.
-- For CLIP ViT backbones, use a compatible image size such as `224`.
+- If `dataset.image_size` is omitted, each backbone uses its native timm input size automatically.
+- For a common-resolution comparison across all backbones, set `dataset.image_size=224`; this value is passed to both the dataset resize and `timm.create_model(..., img_size=224)`.
 - Results are written to `results/equivariance_<experiment_name>/`.
 
 Training outputs include:
@@ -157,7 +158,14 @@ Examples:
 bash scripts/launch_train_equivariance_parallel.sh \
   --max-concurrent 8 \
   --backbone dinov3_vitb16 \
+  dataset.image_size=224 \
   dataset.root=/shared/results/common/kargin/unreal_engine/dataset/probe-equivariance
+
+SLURM_PARTITION=rtx4090_batch \
+SLURM_QOS=batch \
+CONDA_ENV=dinov3 \
+bash scripts/launch_train_equivariance_parallel.sh \
+  --max-concurrent 8
 
 bash scripts/launch_visualize_equivariance_parallel.sh \
   --result-root /shared/results/probe-equivariance/results

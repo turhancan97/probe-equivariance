@@ -430,7 +430,6 @@ def run_equivariance(cfg: DictConfig) -> None:
 
     result_dir = Path(cfg.output_dir) / f"equivariance_{cfg.experiment_name}"
     result_dir.mkdir(parents=True, exist_ok=True)
-    (result_dir / "run_config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True))
 
     save_checkpoints = bool(cfg.training.save_checkpoints)
     checkpoint_dir = result_dir / "checkpoints"
@@ -440,13 +439,9 @@ def run_equivariance(cfg: DictConfig) -> None:
     if use_wandb and wandb is None:
         raise ModuleNotFoundError("wandb.use=true, but wandb is not installed.")
 
-    if use_wandb:
-        wandb.init(
-            project="probe-equivariance",
-            config=OmegaConf.to_container(cfg, resolve=True),
-            name=f"{cfg.experiment_name}_{cfg.experiment_model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            group=f"seed:{cfg.system.random_seed}",
-        )
+    requested_image_size = cfg.dataset.get("image_size")
+    if requested_image_size is not None and int(requested_image_size) <= 0:
+        raise ValueError("dataset.image_size must be positive when specified")
 
     model, feat_dim = load_backbone(
         cfg.backbone.name,
@@ -454,8 +449,24 @@ def run_equivariance(cfg: DictConfig) -> None:
         image_mean=cfg.backbone.get("image_mean"),
         custom_mean=cfg.backbone.get("custom_mean"),
         custom_std=cfg.backbone.get("custom_std"),
+        img_size=None if requested_image_size is None else int(requested_image_size),
     )
     model = model.to(device)
+    resolved_image_size = (
+        int(requested_image_size)
+        if requested_image_size is not None
+        else int(getattr(model, "input_size", 224))
+    )
+    cfg.dataset.image_size = resolved_image_size
+    (result_dir / "run_config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True))
+
+    if use_wandb:
+        wandb.init(
+            project="probe-equivariance",
+            config=OmegaConf.to_container(cfg, resolve=True),
+            name=f"{cfg.experiment_name}_{cfg.experiment_model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            group=f"seed:{cfg.system.random_seed}",
+        )
     norm_overrides = {}
     if getattr(model, "normalize_mean", None) is not None and getattr(model, "normalize_std", None) is not None:
         norm_overrides = {"mean": model.normalize_mean, "std": model.normalize_std}

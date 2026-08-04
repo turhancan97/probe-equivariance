@@ -131,6 +131,7 @@ class RepresentationVisualizationTests(unittest.TestCase):
         ) as load_mock:
             run_representation_visualization(cfg)
         self.assertEqual(load_mock.call_args.kwargs["pool"], "mean")
+        self.assertEqual(load_mock.call_args.kwargs["img_size"], 16)
 
     def test_invalid_pose_metadata_is_rejected(self):
         broken_dir = self.temp_dir / "broken"

@@ -63,16 +63,21 @@ class FrozenBackbone(nn.Module):
         image_mean: str | None = None,
         custom_mean: list | None = None,
         custom_std: list | None = None,
+        img_size: int | None = None,
     ):
         super().__init__()
         if pool not in ("mean", "cls", "patch"):
             raise ValueError(f"Unsupported pool mode: {pool}")
 
         timm_id = BACKBONE_REGISTRY.get(name, name)
-        self.model, self.timm_id = _create_model_with_fallbacks(timm_id)
+        if img_size is None:
+            self.model, self.timm_id = _create_model_with_fallbacks(timm_id)
+        else:
+            self.model, self.timm_id = _create_model_with_fallbacks(timm_id, img_size=img_size)
         self.checkpoint_name = name
         self.pool = pool
         self.feat_dim = self.model.num_features
+        self.input_size = get_model_input_size(self.model)
 
         if image_mean is not None:
             self.normalize_mean, self.normalize_std = _resolve_named_norm_stats(image_mean, custom_mean, custom_std)
@@ -124,12 +129,39 @@ def _resolve_norm_stats(model: nn.Module) -> Tuple[list, list]:
     return list(mean), list(std)
 
 
-def _create_model_with_fallbacks(timm_id: str | Iterable[str]) -> Tuple[nn.Module, str]:
+def get_model_input_size(model: nn.Module) -> int:
+    """Return the model's effective square input size after construction."""
+    patch_embed = getattr(model, "patch_embed", None)
+    image_size = getattr(patch_embed, "img_size", None)
+    if image_size is None:
+        image_size = getattr(model, "img_size", None)
+    if image_size is None:
+        pretrained_cfg = getattr(model, "pretrained_cfg", None) or {}
+        image_size = (
+            pretrained_cfg.get("input_size")
+            if isinstance(pretrained_cfg, dict)
+            else getattr(pretrained_cfg, "input_size", None)
+        )
+    if isinstance(image_size, (tuple, list)):
+        if not image_size:
+            return 224
+        if len(image_size) > 1 and len(set(image_size)) != 1:
+            raise ValueError(f"Expected a square model input size, got {image_size}")
+        image_size = image_size[-1]
+    return int(image_size) if image_size is not None else 224
+
+
+def _create_model_with_fallbacks(
+    timm_id: str | Iterable[str], img_size: int | None = None
+) -> Tuple[nn.Module, str]:
     candidate_ids = (timm_id,) if isinstance(timm_id, str) else tuple(timm_id)
     last_error = None
     for candidate_id in candidate_ids:
         try:
-            model = timm.create_model(candidate_id, pretrained=True, num_classes=0)
+            kwargs = {"pretrained": True, "num_classes": 0}
+            if img_size is not None:
+                kwargs["img_size"] = int(img_size)
+            model = timm.create_model(candidate_id, **kwargs)
             return model, candidate_id
         except (RuntimeError, ValueError) as err:
             last_error = err
@@ -146,6 +178,14 @@ def load_backbone(
     image_mean: str | None = None,
     custom_mean: list | None = None,
     custom_std: list | None = None,
+    img_size: int | None = None,
 ) -> Tuple[FrozenBackbone, int]:
-    model = FrozenBackbone(name, pool=pool, image_mean=image_mean, custom_mean=custom_mean, custom_std=custom_std)
+    model = FrozenBackbone(
+        name,
+        pool=pool,
+        image_mean=image_mean,
+        custom_mean=custom_mean,
+        custom_std=custom_std,
+        img_size=img_size,
+    )
     return model, model.feat_dim
