@@ -31,6 +31,7 @@ The current `evaluation-protocol/` surface supports:
 - patch-token features with `pool: patch`
 - the standard MLP regression head in `configs/probe/regressor.yaml`
 - the regression head supports configurable `probe.depth=0..4`; depth 0 is linear probing and depth 4 is the original funnel
+- Efficient Probing patch-token features are cached in CPU RAM once per split and reused across probe epochs; no feature cache is persisted to disk
 - the Efficient Probing head in `configs/probe/efficient_probing.yaml`
 
 Recent validated state:
@@ -41,6 +42,7 @@ Recent validated state:
 - `visualize_representations.py` supports per-frame CLS or patch-mean representations with PCA, t-SNE, or optional UMAP reduction
 - `scripts/aggregate_backbone_metrics.py` combines per-run object metrics into one normalized CSV including `seed`, and `scripts/plot_backbone_metrics.py` creates ranked all-backbone, size-section, and family-section plots per environment/mode/pool using validation/test RMSE with seed standard-deviation bars
 - `scripts/launch_train_equivariance_parallel.sh`, `scripts/launch_visualize_equivariance_parallel.sh`, and `scripts/launch_visualize_representations_parallel.sh` submit capped arrays over all backbone configs by default and support repeated `--backbone NAME` selection
+- the training launcher honors a trailing `backbone.pool` override when selecting `regressor` versus `efficient_probing`
 - `README.md` documents installation, training, prediction visualization, representation visualization, pooling modes, and Efficient Probing
 - smoke tests exist in `tests/test_smoke.py` and `tests/test_representation_visualization.py`
 

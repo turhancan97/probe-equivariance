@@ -24,6 +24,8 @@ Added separate capped-array launchers plus combined metrics aggregation and back
 - added common image-size support: `dataset.image_size=N` is passed to both dataset preprocessing and `timm.create_model(img_size=N)`
 - changed the training dataset default to automatic backbone-native resolution and recorded the resolved size in `run_config.yaml`
 - made `RegressionHead` depth configurable from 0 to 4, with depth 0 for linear probing and depth 4 preserving the original funnel
+- made the training launcher derive probe selection from a trailing `backbone.pool` override as well as the backbone YAML
+- changed Efficient Probing training to cache detached patch-token features in CPU RAM and reuse them across probe epochs
 
 ### What Changed
 

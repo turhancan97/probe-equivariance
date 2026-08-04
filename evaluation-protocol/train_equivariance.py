@@ -472,41 +472,45 @@ def run_equivariance(cfg: DictConfig) -> None:
         norm_overrides = {"mean": model.normalize_mean, "std": model.normalize_std}
 
     if uses_ep:
-        train_dataset = build_dataset(cfg.dataset, "train", **norm_overrides)
-        val_dataset = build_dataset(cfg.dataset, "valid", **norm_overrides)
-        test_dataset = build_dataset(cfg.dataset, "test", **norm_overrides) if cfg.dataset.test_ratio > 0 else None
-        keys = sorted(train_dataset.group_indices_by_split["train"].keys())
+        num_workers = cfg.training.get("num_workers", 4)
+        train_loader = build_loader(
+            cfg.dataset, "train", cfg.batch_size, num_workers=num_workers, **norm_overrides
+        )
+        val_loader = build_loader(
+            cfg.dataset, "valid", cfg.batch_size, num_workers=num_workers, **norm_overrides
+        )
+        test_loader = (
+            build_loader(cfg.dataset, "test", cfg.batch_size, num_workers=num_workers, **norm_overrides)
+            if cfg.dataset.test_ratio > 0
+            else None
+        )
+
+        logger.info("Caching Efficient Probing patch-token features in CPU memory for this run")
+        train_groups = collect_split_features(train_loader, model, device)
+        val_groups = collect_split_features(val_loader, model, device)
+        test_groups = collect_split_features(test_loader, model, device) if test_loader else {}
+
+        keys = sorted(train_groups.keys())
         backbone_name = model.checkpoint_name
         head_name = cfg.probe.get("_target_", "probe")
         pool_name = cfg.backbone.get("pool", "")
         results = []
         checkpoint_manifest = []
 
-        num_workers = cfg.training.get("num_workers", 0)
         for key in tqdm(keys, desc="Groups"):
             environment, mode, object_name = key
-            train_loader, train_sample_indices = build_group_loader(
-                train_dataset, "train", key, cfg.batch_size, shuffle=True, num_workers=num_workers
-            )
-            val_loader, val_sample_indices = build_group_loader(
-                val_dataset, "valid", key, cfg.batch_size, shuffle=False, num_workers=num_workers
-            )
-            test_loader, test_sample_indices = (
-                build_group_loader(
-                    test_dataset, "test", key, cfg.batch_size, shuffle=False, num_workers=num_workers
-                )
-                if test_dataset is not None
-                else (None, [])
-            )
+            train_records = train_groups.get(key, [])
+            val_records = val_groups.get(key, [])
+            test_records = test_groups.get(key, [])
             log_prefix = "_".join([
                 _sanitize_name(environment),
                 _sanitize_name(mode),
                 _sanitize_name(object_name),
             ])
 
-            if len(train_sample_indices) < cfg.training.min_samples_per_object:
+            if len(train_records) < cfg.training.min_samples_per_object:
                 logger.info(
-                    f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_sample_indices)})"
+                    f"Skipping {environment}/{mode}/{object_name} (insufficient samples: {len(train_records)})"
                 )
                 results.append(
                     {
@@ -519,9 +523,9 @@ def run_equivariance(cfg: DictConfig) -> None:
                         "train_rmse": float("nan"),
                         "val_rmse": float("nan"),
                         "test_rmse": float("nan"),
-                        "num_train": len(train_sample_indices),
-                        "num_val": len(val_sample_indices),
-                        "num_test": len(test_sample_indices),
+                        "num_train": len(train_records),
+                        "num_val": len(val_records),
+                        "num_test": len(test_records),
                     }
                 )
                 checkpoint_manifest.append(
@@ -530,27 +534,31 @@ def run_equivariance(cfg: DictConfig) -> None:
                         "mode": mode,
                         "object": object_name,
                         "checkpoint_path": None,
-                        "num_train": len(train_sample_indices),
-                        "num_val": len(val_sample_indices),
-                        "num_test": len(test_sample_indices),
+                        "num_train": len(train_records),
+                        "num_val": len(val_records),
+                        "num_test": len(test_records),
                     }
                 )
                 continue
 
             output_dim = regression_dim(mode)
+            train_features, train_targets = stack_records(train_records)
+            val_features, val_targets = stack_records(val_records)
+            test_features, test_targets = stack_records(test_records)
             head = _instantiate_probe(cfg, feat_dim, output_dim)
-            metrics = train_probe_on_image_loaders(
+            metrics = train_probe(
                 head,
-                model,
-                train_loader,
-                val_loader,
+                train_features,
+                train_targets,
+                val_features,
+                val_targets,
                 device,
                 cfg,
                 log_prefix,
                 use_wandb,
             )
             trained_head = metrics.pop("head")
-            test_mse, test_rmse = evaluate_head_on_image_loader(trained_head, model, test_loader, device)
+            test_mse, test_rmse = evaluate_head(trained_head, test_features, test_targets, device)
 
             checkpoint_relpath = None
             if save_checkpoints:
@@ -578,9 +586,9 @@ def run_equivariance(cfg: DictConfig) -> None:
                     "train_rmse": metrics["train_rmse"],
                     "val_rmse": metrics["val_rmse"],
                     "test_rmse": test_rmse,
-                    "num_train": len(train_sample_indices),
-                    "num_val": len(val_sample_indices),
-                    "num_test": len(test_sample_indices),
+                    "num_train": len(train_records),
+                    "num_val": len(val_records),
+                    "num_test": len(test_records),
                 }
             )
             checkpoint_manifest.append(
@@ -589,9 +597,9 @@ def run_equivariance(cfg: DictConfig) -> None:
                     "mode": mode,
                     "object": object_name,
                     "checkpoint_path": checkpoint_relpath,
-                    "num_train": len(train_sample_indices),
-                    "num_val": len(val_sample_indices),
-                    "num_test": len(test_sample_indices),
+                    "num_train": len(train_records),
+                    "num_val": len(val_records),
+                    "num_test": len(test_records),
                 }
             )
     else:

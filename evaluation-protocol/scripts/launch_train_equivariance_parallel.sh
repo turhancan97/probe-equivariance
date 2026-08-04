@@ -9,11 +9,27 @@ LAUNCH_SCRIPT="${PROJECT_ROOT}/scripts/launch_train_equivariance_parallel.sh"
 WORKFLOW_NAME="train_equivariance"
 JOB_PREFIX="probe_eq_train"
 
+effective_backbone_pool() {
+  local backbone="$1"
+  local override=""
+  local arg
+  for arg in "${EXTRA_ARGS[@]}"; do
+    case "$arg" in
+      backbone.pool=*) override="${arg#backbone.pool=}" ;;
+    esac
+  done
+  if [[ -n "$override" ]]; then
+    printf '%s\n' "$override"
+  else
+    backbone_pool "$backbone"
+  fi
+}
+
 build_run_specs() {
   RUN_NAMES=()
   RUN_ARG_STRINGS=()
   for backbone in "${BACKBONE_CONFIGS[@]}"; do
-    pool="$(backbone_pool "$backbone")"
+    pool="$(effective_backbone_pool "$backbone")"
     case "$pool" in
       patch) probe="efficient_probing" ;;
       mean|cls) probe="regressor" ;;
@@ -42,7 +58,8 @@ Usage:
 
 Schedules one run for every config in configs/backbone/. The launcher selects
 probe=efficient_probing for configs with pool=patch and probe=regressor for
-configs with pool=mean or pool=cls.
+configs with pool=mean or pool=cls. A trailing backbone.pool=... Hydra
+override also controls this probe selection.
 
 Options:
   --backend local|slurm       Execution backend (default: slurm)

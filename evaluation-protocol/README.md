@@ -150,6 +150,8 @@ bash scripts/launch_visualize_representations_parallel.sh
 
 The launchers discover every YAML file under `configs/backbone/` and create one run per backbone by default. Select a subset with one or more `--backbone` options; if no `--backbone` is supplied, all available configs are used. The training launcher reads each config's `pool` value and selects `probe=efficient_probing` for `pool: patch`, or `probe=regressor` for `pool: mean`/`pool: cls`. Training run names are unique and checkpoint saving is enabled automatically.
 
+The training launcher also honors a trailing `backbone.pool` override when selecting the probe. For example, `backbone.pool=patch` selects Efficient Probing for every selected backbone, even when the backbone YAML currently says `pool: mean`.
+
 The default Slurm backend submits one capped array job. With the default cap of four, an experiment set of `N` runs is submitted as `--array=0-(N-1)%4`, so each task requests one GPU but no more than four tasks run concurrently. Use `--max-concurrent N` to change the cap or `--backend local` for capped local background execution. Use `--dry-run` to print every generated command and the Slurm resources without launching anything.
 
 Examples:
@@ -342,6 +344,8 @@ This probe:
 - applies cross-attention over patch tokens using learned queries
 - optionally applies `LayerNorm`
 - uses a final linear regressor to predict the target
+
+During training, patch-token features are extracted once per split and cached in CPU RAM for the duration of the run. They are reused across all probe epochs; the cache is not written to disk. This avoids repeated backbone inference while keeping the cache bounded by the current dataset and run.
 
 Example:
 
