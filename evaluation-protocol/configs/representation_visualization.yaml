@@ -1,0 +1,27 @@
+defaults:
+  - backbone: dinov3_vitb16
+  - _self_
+
+video_dir: /shared/results/common/kargin/unreal_engine/dataset/probe-equivariance/FirstPersonMap/cube/camera_line
+output_dir: results/representation_visualizations
+image_size: null
+representation: cls # cls | patch_mean
+batch_size: 64
+num_workers: 4
+device: auto # auto | cpu | cuda
+random_seed: 8
+
+reduction:
+  method: pca # pca | tsne | umap
+  pca:
+    whiten: false
+    svd_solver: auto
+  tsne:
+    perplexity: null # null selects an adaptive value based on frame count
+    learning_rate: auto
+    init: pca
+    max_iter: 1000
+  umap:
+    n_neighbors: null # null selects min(15, frame_count - 1)
+    min_dist: 0.1
+    metric: euclidean

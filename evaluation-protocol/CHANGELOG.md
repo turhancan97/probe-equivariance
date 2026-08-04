@@ -8,6 +8,37 @@ Use one entry per meaningful session or task bundle. Record exact dates, meaning
 
 ### Summary
 
+Implemented the standalone per-frame representation visualization workflow.
+
+### What Changed
+
+- added `visualize_representations.py` and its Hydra configuration
+- added pose-JSON-ordered frame loading for one motion directory
+- added CLS and global patch-mean representations with native timm preprocessing
+- added PCA, seeded t-SNE, and optional UMAP reduction
+- added temporal plots, per-frame CSV output, and resolved config metadata
+- added focused smoke tests and `scikit-learn` to the required dependencies
+- documented the workflow and optional `umap-learn` installation
+
+### Verification
+
+- representation smoke tests cover frame ordering, both representation mappings, PCA outputs, seeded t-SNE, output files, invalid metadata, and missing UMAP
+- `py_compile`, Hydra help/config composition, focused representation tests, existing evaluation smoke tests, and combined test discovery passed in `dinov3`
+
+Verification status: passed
+
+### Known Blockers / Risks
+
+- UMAP execution requires installing the optional `umap-learn` package in the active environment
+
+### Next Recommended Actions
+
+- run the workflow against a real shared motion directory with the selected backbone
+
+## 2026-08-03
+
+### Summary
+
 Added AI-first handoff documentation for future sessions and recorded the current validated state of `evaluation-protocol/`.
 
 ### What Changed

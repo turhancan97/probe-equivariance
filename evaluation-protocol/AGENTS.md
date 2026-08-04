@@ -12,6 +12,7 @@ This subtree owns:
 - frozen backbone feature extraction via `timm`
 - per-group probe training for equivariance evaluation
 - prediction visualization and smoke tests
+- separate per-frame representation visualization with dimensionality reduction
 - local documentation for how this subtree works
 
 This file does not try to document the rest of the repository in detail. For broader repo context, inspect the top-level project files directly.
@@ -33,8 +34,9 @@ Recent validated state:
 
 - the Efficient Probing path is implemented and has been reported as passing in the local `dinov3` environment
 - visualization supports both pooled-feature probes and Efficient Probing checkpoints
-- `README.md` documents installation, training, visualization, pooling modes, and Efficient Probing
-- smoke tests exist in `tests/test_smoke.py`
+- `visualize_representations.py` supports per-frame CLS or patch-mean representations with PCA, t-SNE, or optional UMAP reduction
+- `README.md` documents installation, training, prediction visualization, representation visualization, pooling modes, and Efficient Probing
+- smoke tests exist in `tests/test_smoke.py` and `tests/test_representation_visualization.py`
 
 ## Key Architecture And Decisions
 
@@ -45,6 +47,9 @@ Recent validated state:
 - `pool: patch` excludes prefix tokens such as CLS before returning patch tokens.
 - Efficient Probing currently supports `num_heads: 1` only.
 - Visualization overlays train, valid, and test predictions on the same plot, with one ground-truth color and split-specific prediction colors.
+- Representation visualization processes one motion directory in pose-JSON order and writes a temporal 2D plot, frame CSV, and resolved config metadata.
+- Representation visualization maps `cls` to the backbone CLS token and `patch_mean` to the existing mean-over-patch-token path; it does not use probe checkpoints.
+- t-SNE and UMAP are seeded; UMAP is imported only when selected and remains an optional dependency.
 
 Important constraints:
 
@@ -76,7 +81,9 @@ Common commands:
 cd evaluation-protocol
 conda run -n dinov3 python train_equivariance.py
 conda run -n dinov3 python visualize_equivariance.py result_dir=results/equivariance_my_run
+conda run -n dinov3 python visualize_representations.py
 conda run -n dinov3 python -m unittest discover -s tests -p 'test_smoke.py'
+conda run -n dinov3 python -m unittest discover -s tests -p 'test_representation_visualization.py'
 ```
 
 Common overrides:
@@ -100,7 +107,8 @@ conda run -n dinov3 python train_equivariance.py \
 - `backbone.name=clip_b16_laion`, `backbone.pool=mean`, `probe=regressor`
 - `backbone.name=clip_b16_laion`, `backbone.pool=patch`, `probe=efficient_probing`
 - visualization after training with `training.save_checkpoints=true`
-- smoke-test entrypoint: `python -m unittest discover -s tests -p 'test_smoke.py'`
+- representation visualization with PCA in the local smoke tests
+- smoke-test entrypoints: `python -m unittest discover -s tests -p 'test_smoke.py'` and `python -m unittest discover -s tests -p 'test_representation_visualization.py'`
 
 ## Pending Items
 
@@ -111,6 +119,7 @@ Things to re-check when changing behavior:
 - keep `README.md`, `AGENTS.md`, and `CHANGELOG.md` aligned
 - if Efficient Probing tensor contracts change, update both training and visualization reload paths together
 - if new probe types are added, update compatibility validation and smoke tests
+- if representation reducers or output fields change, update the representation smoke tests and README together
 
 ## Next Steps
 
@@ -119,14 +128,13 @@ Near-term likely follow-ups:
 - keep agent handoff docs current after each material change
 - extend smoke coverage when new backbones, probes, or dataset behaviors are added
 - preserve clear validation errors for unsupported probe/backbone combinations
-- define the config surface for a future representation-visualization workflow before implementing it
+- preserve the standalone boundary between prediction and representation visualization
 
 ## Longer-Term Roadmap
 
 - add more backbone configurations and verify their normalization defaults carefully
 - expand probe options beyond the current MLP and single-head Efficient Probing path if there is a concrete use case
 - improve experiment bookkeeping if session history or checkpoint metadata becomes harder to trace
-- add a separate representation-visualization workflow that can take a specific video directory such as `/shared/results/common/kargin/unreal_engine/dataset/probe-equivariance/FirstPersonMap/cube/camera_line`, a chosen backbone, a representation type (`cls` or global average pooled patch tokens), and a dimensionality-reduction method (`PCA`, `t-SNE`, or `UMAP`) to visualize per-frame representations; this is future work only and is not implemented yet
 
 ## Rejected / Avoid
 

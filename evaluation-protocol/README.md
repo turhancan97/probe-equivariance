@@ -51,7 +51,9 @@ The current requirements are lightweight except for the deep learning stack:
 - `numpy`
 - `Pillow`
 - `matplotlib`
+- `scikit-learn`
 - `wandb` is optional and only needed when `wandb.use=true`
+- `umap-learn` is optional and only needed when using UMAP reduction
 
 ## Dataset
 
@@ -131,6 +133,47 @@ The current visualization behavior is:
 - one figure per `(environment, mode, object)`
 - ground truth shown once in one color
 - predictions for `train`, `valid`, and `test` overlaid in different colors on the same plot
+
+### Visualize per-frame representations
+
+Representation visualization is a separate workflow from prediction visualization. It processes one generated motion directory, extracts one representation per frame with a frozen pretrained backbone, reduces the representations to two dimensions, and writes a temporal plot plus CSV coordinates.
+
+Run it with the supplied example configuration:
+
+```bash
+conda run -n dinov3 python visualize_representations.py
+```
+
+Choose the input directory, backbone, representation, and reduction with Hydra overrides:
+
+```bash
+conda run -n dinov3 python visualize_representations.py \
+  video_dir=/shared/results/common/kargin/unreal_engine/dataset/probe-equivariance/FirstPersonMap/cube/camera_line \
+  backbone=dinov3_vits16 \
+  representation=patch_mean \
+  reduction.method=pca
+```
+
+The input must be one motion directory, such as `camera_line`. Its mode-specific pose JSON supplies the canonical frame order and image filenames. Every pose-referenced frame is processed.
+
+Supported representations are:
+
+- `cls`: the backbone's CLS token
+- `patch_mean`: the global average of patch tokens, excluding prefix tokens
+
+Supported reductions are `pca`, `tsne`, and `umap`. Reduction settings are configurable in `configs/representation_visualization.yaml`, including the t-SNE/UMAP random seed and short-sequence adaptive defaults. For UMAP, install the optional dependency in the active environment:
+
+```bash
+conda run -n dinov3 pip install umap-learn
+```
+
+By default, outputs are written under `results/representation_visualizations/` in a run-specific directory containing:
+
+- `representation.png`: a 2D scatter plot colored and connected by frame index
+- `frames.csv`: frame index, original image path, and two reduced coordinates
+- `config.yaml`: resolved workflow settings and extraction metadata
+
+The selected backbone's native timm input size and normalization are used by default. Override `image_size` or `backbone.image_mean` when an experiment requires it. A raw timm model name can be supplied through `backbone.name` when it is not in the friendly-name registry.
 
 ## Feature Extraction
 

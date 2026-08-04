@@ -10,3 +10,4 @@ Pillow
 # Optional: only needed when wandb.use=true
 
 matplotlib
+scikit-learn
