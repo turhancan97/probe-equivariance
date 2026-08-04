@@ -107,6 +107,72 @@ Training outputs include:
 - `checkpoint_manifest.json`
 - `checkpoints/*.pt` when checkpoint saving is enabled
 
+### Aggregate and compare backbone metrics
+
+After multiple backbone runs finish, aggregate their per-run `object_metrics.csv` files into one normalized CSV:
+
+```bash
+conda run -n dinov3 python scripts/aggregate_backbone_metrics.py \
+  --results-root results \
+  --output results/combined_backbone_metrics.csv
+```
+
+By default, repeated historical rows from the same result/object key are deduplicated by retaining the latest timestamp. Add `--keep-history` to preserve every recorded row.
+
+Create three comparison plots for each environment/mode/pool combination:
+
+```bash
+conda run -n dinov3 python scripts/plot_backbone_metrics.py \
+  --metrics-csv results/combined_backbone_metrics.csv \
+  --output-dir results/backbone_comparisons
+```
+
+The plots contain validation and test RMSE only. Backbones are ordered best-to-worst by ascending validation RMSE, with test RMSE as the tie-breaker. If an environment/mode contains multiple objects, the plotted value is the mean across objects. The output contains:
+
+- `<environment>__<mode>__<pool>.png`: all backbones in one ranked plot
+- `<environment>__<mode>__<pool>__by_size.png`: three columns for Small, Base, and Large backbones
+- `<environment>__<mode>__<pool>__by_family.png`: one section per backbone family, such as CLIP and DINOv2
+
+Pool modes are plotted independently, so `mean`, `cls`, and `patch` results never share bars or averages.
+
+Use `--order-by test_rmse` to rank primarily by test RMSE, or `--metrics val_rmse` for validation-only plots.
+
+### Launch experiments in parallel
+
+Three separate launchers are provided under `scripts/`:
+
+```bash
+bash scripts/launch_train_equivariance_parallel.sh
+bash scripts/launch_visualize_equivariance_parallel.sh
+bash scripts/launch_visualize_representations_parallel.sh
+```
+
+The launchers discover every YAML file under `configs/backbone/` and create one run per backbone by default. Select a subset with one or more `--backbone` options; if no `--backbone` is supplied, all available configs are used. The training launcher reads each config's `pool` value and selects `probe=efficient_probing` for `pool: patch`, or `probe=regressor` for `pool: mean`/`pool: cls`. Training run names are unique and checkpoint saving is enabled automatically.
+
+The default Slurm backend submits one capped array job. With the default cap of four, an experiment set of `N` runs is submitted as `--array=0-(N-1)%4`, so each task requests one GPU but no more than four tasks run concurrently. Use `--max-concurrent N` to change the cap or `--backend local` for capped local background execution. Use `--dry-run` to print every generated command and the Slurm resources without launching anything.
+
+Examples:
+
+```bash
+bash scripts/launch_train_equivariance_parallel.sh \
+  --max-concurrent 8 \
+  --backbone dinov3_vitb16 \
+  dataset.root=/shared/results/common/kargin/unreal_engine/dataset/probe-equivariance
+
+bash scripts/launch_visualize_equivariance_parallel.sh \
+  --result-root /shared/results/probe-equivariance/results
+
+bash scripts/launch_visualize_representations_parallel.sh \
+  --backbone dinov3_vitb16 \
+  --video-dir /shared/results/common/kargin/unreal_engine/dataset/probe-equivariance/FirstPersonMap/cube/camera_line \
+  --representation patch_mean \
+  --reduction pca
+```
+
+Slurm resource defaults match the reference launcher: one GPU, 10 CPUs, 64G memory, 24 hours, one task, and node exclusions `c22,c11,c12,c13,c17`. Override them with `SLURM_PARTITION`, `SLURM_QOS`, `SLURM_ACCOUNT`, `SLURM_GPUS`, `SLURM_CPUS`, `SLURM_MEM`, `SLURM_TIME`, `SLURM_NTASKS`, and `SLURM_EXCLUDE`. Jobs run through `conda run -n dinov3 python` by default. Set `SBATCH_BIN` if the HPC site exposes submission through a wrapper. Logs are written to `evaluation-protocol/logs/`; set `LOG_DIR` to change this.
+
+Trailing Hydra overrides are passed through to every generated run. The visualization launchers expect the corresponding training outputs to exist before they are submitted.
+
 ### Visualize predictions vs ground truth
 
 After training with checkpoints enabled, run:

@@ -4,6 +4,48 @@ Reverse-chronological session log for `evaluation-protocol/`.
 
 Use one entry per meaningful session or task bundle. Record exact dates, meaningful behavior-level changes, verification status, blockers, and the next recommended actions.
 
+## 2026-08-04
+
+### Summary
+
+Added separate capped-array launchers plus combined metrics aggregation and backbone comparison plotting.
+
+### Follow-up
+
+- added repeated `--backbone NAME` selection to all three launchers
+- omitted `--backbone` now preserves the all-backbone default
+- training probe selection now reads each backbone config's actual `pool` value
+- fixed Slurm array workers to source the shared launcher helper from the exported repository root instead of `/var/spool/slurmd/`
+- added `aggregate_backbone_metrics.py` for one combined object-level metrics CSV
+- updated `plot_backbone_metrics.py` to plot validation/test RMSE only, rank backbones best-to-worst, add size/family comparison views, and separate every pool mode
+- included `pool` in aggregation deduplication keys so mean/cls/patch histories remain independent
+
+### What Changed
+
+- added independent launchers for `train_equivariance.py`, `visualize_equivariance.py`, and `visualize_representations.py`
+- added a shared array engine with local execution, Slurm submission, dry-run output, per-task logs, and trailing Hydra override support
+- enumerated all backbone configs automatically
+- selected the probe from each backbone config's `pool` value and enabled checkpoint saving for training runs
+- capped Slurm arrays with `--array=...%N` so each task requests one GPU without scheduling the full sweep concurrently
+- documented reference-matching Slurm resource environment overrides
+
+### Verification
+
+- launcher scripts pass shell syntax validation
+- dry-run output, default all-backbone expansion, single and repeated `--backbone` selection, invalid-selector rejection, local capped placeholder execution, array worker selection, and generated `--array=0-22%4` resource commands were checked locally
+- aggregation and plotting smoke tests cover normalized CSV output and environment/mode comparison plots
+- full Slurm submission was not run because this environment is not a Slurm controller
+
+Verification status: partial
+
+### Known Blockers / Risks
+
+- actual `sbatch` behavior, cluster-specific resource names, and node exclusions must be validated on the target HPC system
+
+### Next Recommended Actions
+
+- run each launcher with `--dry-run` on the HPC login node, then submit a small capped training array before launching visualization arrays
+
 ## 2026-08-03
 
 ### Summary

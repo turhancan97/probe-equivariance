@@ -13,6 +13,8 @@ This subtree owns:
 - per-group probe training for equivariance evaluation
 - prediction visualization and smoke tests
 - separate per-frame representation visualization with dimensionality reduction
+- metrics aggregation and backbone-comparison plotting workflows
+- Slurm/local capped-array launchers for training and both visualization workflows
 - local documentation for how this subtree works
 
 This file does not try to document the rest of the repository in detail. For broader repo context, inspect the top-level project files directly.
@@ -35,6 +37,8 @@ Recent validated state:
 - the Efficient Probing path is implemented and has been reported as passing in the local `dinov3` environment
 - visualization supports both pooled-feature probes and Efficient Probing checkpoints
 - `visualize_representations.py` supports per-frame CLS or patch-mean representations with PCA, t-SNE, or optional UMAP reduction
+- `scripts/aggregate_backbone_metrics.py` combines per-run object metrics into one normalized CSV, and `scripts/plot_backbone_metrics.py` creates ranked all-backbone, size-section, and family-section plots per environment/mode/pool using validation/test RMSE
+- `scripts/launch_train_equivariance_parallel.sh`, `scripts/launch_visualize_equivariance_parallel.sh`, and `scripts/launch_visualize_representations_parallel.sh` submit capped arrays over all backbone configs by default and support repeated `--backbone NAME` selection
 - `README.md` documents installation, training, prediction visualization, representation visualization, pooling modes, and Efficient Probing
 - smoke tests exist in `tests/test_smoke.py` and `tests/test_representation_visualization.py`
 
@@ -50,6 +54,9 @@ Recent validated state:
 - Representation visualization processes one motion directory in pose-JSON order and writes a temporal 2D plot, frame CSV, and resolved config metadata.
 - Representation visualization maps `cls` to the backbone CLS token and `patch_mean` to the existing mean-over-patch-token path; it does not use probe checkpoints.
 - t-SNE and UMAP are seeded; UMAP is imported only when selected and remains an optional dependency.
+- Array launchers request one GPU per task and cap concurrent tasks with Slurm's `%N` array limit; they do not poll `squeue` or submit one job per run.
+- Slurm submissions explicitly export the `evaluation-protocol/` root because Slurm executes a copied launcher from `/var/spool/slurmd/`.
+- `SBATCH_BIN` may point to a cluster-specific submit wrapper when `sbatch` is not directly available on the login shell.
 
 Important constraints:
 
@@ -67,7 +74,9 @@ For a new AI session working only in `evaluation-protocol/`:
 3. Read `README.md` for the human-facing workflow and command reference.
 4. Inspect `train_equivariance.py`, `visualize_equivariance.py`, and `tests/test_smoke.py` before changing behavior.
 5. If modifying backbone/probe behavior, inspect `evals/models/backbone.py` and `evals/models/probe.py` directly.
-6. After any material change in this subtree, update both `AGENTS.md` and `CHANGELOG.md`.
+6. If changing experiment launching, inspect the three `scripts/launch_*_parallel.sh` files and `scripts/launch_array_common.sh`.
+7. If changing metrics aggregation or plotting, inspect both `scripts/aggregate_backbone_metrics.py` and `scripts/plot_backbone_metrics.py`.
+8. After any material change in this subtree, update both `AGENTS.md` and `CHANGELOG.md`.
 
 ## Canonical Commands
 
@@ -82,6 +91,11 @@ cd evaluation-protocol
 conda run -n dinov3 python train_equivariance.py
 conda run -n dinov3 python visualize_equivariance.py result_dir=results/equivariance_my_run
 conda run -n dinov3 python visualize_representations.py
+bash scripts/launch_train_equivariance_parallel.sh --dry-run
+bash scripts/launch_visualize_equivariance_parallel.sh --dry-run
+bash scripts/launch_visualize_representations_parallel.sh --dry-run
+conda run -n dinov3 python scripts/aggregate_backbone_metrics.py --help
+conda run -n dinov3 python scripts/plot_backbone_metrics.py --help
 conda run -n dinov3 python -m unittest discover -s tests -p 'test_smoke.py'
 conda run -n dinov3 python -m unittest discover -s tests -p 'test_representation_visualization.py'
 ```
@@ -108,6 +122,8 @@ conda run -n dinov3 python train_equivariance.py \
 - `backbone.name=clip_b16_laion`, `backbone.pool=patch`, `probe=efficient_probing`
 - visualization after training with `training.save_checkpoints=true`
 - representation visualization with PCA in the local smoke tests
+- shell launchers pass `bash -n` and dry-run validation
+- metrics aggregation and plotting smoke tests pass
 - smoke-test entrypoints: `python -m unittest discover -s tests -p 'test_smoke.py'` and `python -m unittest discover -s tests -p 'test_representation_visualization.py'`
 
 ## Pending Items
@@ -120,6 +136,9 @@ Things to re-check when changing behavior:
 - if Efficient Probing tensor contracts change, update both training and visualization reload paths together
 - if new probe types are added, update compatibility validation and smoke tests
 - if representation reducers or output fields change, update the representation smoke tests and README together
+- if Slurm resource flags, array caps, or launcher naming changes, update all three launchers and their README examples together
+- if backbone selection behavior changes, update the shared launcher parser, all three launcher help texts, and the README examples together
+- if metric CSV fields or comparison grouping changes, update both metrics scripts, tests, and README together
 
 ## Next Steps
 
