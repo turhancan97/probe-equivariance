@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 from evals.datasets.builder import build_loader
 from evals.models.backbone import BACKBONE_REGISTRY, FrozenBackbone
+from evals.models.probe import RegressionHead
 from train_equivariance import run_equivariance
 from visualize_equivariance import run_visualization
 
@@ -168,6 +169,18 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
 
         mocked_create.assert_called_once_with("dummy_model", img_size=224)
         self.assertEqual(model.input_size, 224)
+
+    def test_regression_head_depths(self):
+        expected_linear_counts = {0: 1, 1: 1, 2: 2, 3: 3, 4: 4}
+        for depth, expected_count in expected_linear_counts.items():
+            with self.subTest(depth=depth):
+                head = RegressionHead(feat_dim=32, output_dim=2, depth=depth)
+                linear_layers = [layer for layer in head.regressor if isinstance(layer, nn.Linear)]
+                self.assertEqual(len(linear_layers), expected_count)
+                self.assertEqual(head(torch.randn(3, 32)).shape, (3, 2))
+
+        with self.assertRaisesRegex(ValueError, "between 0 and 4"):
+            RegressionHead(feat_dim=32, output_dim=2, depth=5)
 
     def test_run_equivariance_and_visualization_smoke(self):
         cfg = self._build_train_cfg(

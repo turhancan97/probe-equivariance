@@ -30,6 +30,7 @@ The current `evaluation-protocol/` surface supports:
 - pooled backbone features with `pool: mean` and `pool: cls`
 - patch-token features with `pool: patch`
 - the standard MLP regression head in `configs/probe/regressor.yaml`
+- the regression head supports configurable `probe.depth=0..4`; depth 0 is linear probing and depth 4 is the original funnel
 - the Efficient Probing head in `configs/probe/efficient_probing.yaml`
 
 Recent validated state:

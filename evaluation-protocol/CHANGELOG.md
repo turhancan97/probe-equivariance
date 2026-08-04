@@ -23,6 +23,7 @@ Added separate capped-array launchers plus combined metrics aggregation and back
 - added seed-aware aggregation and validation/test RMSE standard-deviation error bars computed across seeds
 - added common image-size support: `dataset.image_size=N` is passed to both dataset preprocessing and `timm.create_model(img_size=N)`
 - changed the training dataset default to automatic backbone-native resolution and recorded the resolved size in `run_config.yaml`
+- made `RegressionHead` depth configurable from 0 to 4, with depth 0 for linear probing and depth 4 preserving the original funnel
 
 ### What Changed
 

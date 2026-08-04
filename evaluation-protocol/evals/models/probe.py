@@ -3,20 +3,46 @@ import torch.nn as nn
 
 
 class RegressionHead(nn.Module):
-    """MLP funnel: feat_dim -> feat_dim/2 -> feat_dim/4 -> feat_dim/8 -> output_dim."""
+    """Configurable regression funnel with zero-to-four linear stages.
 
-    def __init__(self, feat_dim: int, output_dim: int, use_layernorm: bool = True):
+    ``depth=0`` is a linear probe. ``depth=4`` is the original funnel:
+    ``feat_dim -> feat_dim/2 -> feat_dim/4 -> feat_dim/8 -> output_dim``.
+    For positive depths, depth counts the linear layers including the final
+    output layer; therefore depth=1 is also a single linear layer.
+    """
+
+    def __init__(
+        self,
+        feat_dim: int,
+        output_dim: int,
+        use_layernorm: bool = True,
+        depth: int = 4,
+    ):
         super().__init__()
+        if not 0 <= depth <= 4:
+            raise ValueError(f"RegressionHead depth must be between 0 and 4, got {depth}")
+        if feat_dim <= 0 or output_dim <= 0:
+            raise ValueError("feat_dim and output_dim must be positive")
+
         self.norm = nn.LayerNorm(feat_dim) if use_layernorm else None
-        self.regressor = nn.Sequential(
-            nn.Linear(feat_dim, feat_dim // 2),
-            nn.ReLU(),
-            nn.Linear(feat_dim // 2, feat_dim // 4),
-            nn.ReLU(),
-            nn.Linear(feat_dim // 4, feat_dim // 8),
-            nn.ReLU(),
-            nn.Linear(feat_dim // 8, output_dim),
-        )
+        self.depth = depth
+
+        if depth == 0:
+            dimensions = [feat_dim, output_dim]
+        else:
+            hidden_dimensions = [
+                max(1, feat_dim // (2**index)) for index in range(1, depth)
+            ]
+            dimensions = [feat_dim, *hidden_dimensions, output_dim]
+
+        layers: list[nn.Module] = []
+        for index, (input_dim, output_dim_for_layer) in enumerate(
+            zip(dimensions[:-1], dimensions[1:])
+        ):
+            layers.append(nn.Linear(input_dim, output_dim_for_layer))
+            if index < len(dimensions) - 2:
+                layers.append(nn.ReLU())
+        self.regressor = nn.Sequential(*layers)
 
     def forward(self, feats: torch.Tensor) -> torch.Tensor:
         if self.norm is not None:

@@ -321,7 +321,13 @@ conda run -n dinov3 python train_equivariance.py backbone.pool=patch probe=effic
 
 ## Probe
 
-The regression head is defined in `configs/probe/regressor.yaml` and implemented in `evals/models/probe.py`.
+The regression head is defined in `configs/probe/regressor.yaml` and implemented in `evals/models/probe.py`. Its `depth` is configurable from `0` to `4`:
+
+- `depth=0`: linear probing (`feat_dim -> output_dim`)
+- `depth=2`: two linear stages (`feat_dim -> feat_dim/2 -> output_dim`)
+- `depth=4`: the original funnel (`feat_dim -> feat_dim/2 -> feat_dim/4 -> feat_dim/8 -> output_dim`)
+
+The default is `depth=4`, preserving the previous behavior. Use, for example, `probe.depth=0` for a linear probe or `probe.depth=2` for a shallower regressor.
 
 It is a small MLP trained on top of frozen backbone features:
 
