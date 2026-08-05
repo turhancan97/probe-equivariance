@@ -1,3 +1,4 @@
 _target_: evals.models.probe.RegressionHead
 use_layernorm: true
 depth: 0
+dropout: 0.0

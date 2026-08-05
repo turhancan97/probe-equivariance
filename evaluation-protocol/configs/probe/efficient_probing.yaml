@@ -5,3 +5,4 @@ d_out: 2
 use_layernorm: true
 qkv_bias: false
 qk_scale: null
+dropout: 0.0

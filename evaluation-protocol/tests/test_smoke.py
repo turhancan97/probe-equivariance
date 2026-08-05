@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 
 from evals.datasets.builder import build_loader
 from evals.models.backbone import BACKBONE_REGISTRY, FrozenBackbone
-from evals.models.probe import RegressionHead
+from evals.models.probe import EfficientProbingHead, RegressionHead
 from train_equivariance import run_equivariance
 from visualize_equivariance import run_visualization
 
@@ -181,6 +181,24 @@ class EvaluationProtocolSmokeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "between 0 and 4"):
             RegressionHead(feat_dim=32, output_dim=2, depth=5)
+
+    def test_probe_dropout_configuration(self):
+        regression_head = RegressionHead(feat_dim=32, output_dim=2, depth=4, dropout=0.25)
+        self.assertTrue(any(isinstance(layer, nn.Dropout) for layer in regression_head.regressor))
+
+        efficient_head = EfficientProbingHead(
+            feat_dim=32,
+            output_dim=2,
+            num_queries=4,
+            d_out=2,
+            dropout=0.25,
+        )
+        self.assertIsInstance(efficient_head.dropout, nn.Dropout)
+
+        with self.assertRaisesRegex(ValueError, "dropout must be in"):
+            RegressionHead(feat_dim=32, output_dim=2, dropout=1.0)
+        with self.assertRaisesRegex(ValueError, "dropout must be in"):
+            EfficientProbingHead(feat_dim=32, output_dim=2, dropout=-0.1)
 
     def test_run_equivariance_and_visualization_smoke(self):
         cfg = self._build_train_cfg(

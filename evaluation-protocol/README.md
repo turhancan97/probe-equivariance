@@ -329,7 +329,7 @@ The regression head is defined in `configs/probe/regressor.yaml` and implemented
 - `depth=2`: two linear stages (`feat_dim -> feat_dim/2 -> output_dim`)
 - `depth=4`: the original funnel (`feat_dim -> feat_dim/2 -> feat_dim/4 -> feat_dim/8 -> output_dim`)
 
-The default is `depth=4`, preserving the previous behavior. Use, for example, `probe.depth=0` for a linear probe or `probe.depth=2` for a shallower regressor.
+The default depth is controlled by `configs/probe/regressor.yaml`. Use, for example, `probe.depth=0` for a linear probe or `probe.depth=2` for a shallower regressor. Both probe heads also accept `dropout`, a probability in `[0, 1)`, defaulting to `0.0`. Regression-head dropout is applied after hidden activations; Efficient Probing dropout is applied after optional LayerNorm and before its final regressor.
 
 It is a small MLP trained on top of frozen backbone features:
 

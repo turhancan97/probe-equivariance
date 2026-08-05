@@ -26,6 +26,7 @@ Added separate capped-array launchers plus combined metrics aggregation and back
 - made `RegressionHead` depth configurable from 0 to 4, with depth 0 for linear probing and depth 4 preserving the original funnel
 - made the training launcher derive probe selection from a trailing `backbone.pool` override as well as the backbone YAML
 - changed Efficient Probing training to cache detached patch-token features in CPU RAM and reuse them across probe epochs
+- added configurable dropout to both `RegressionHead` and `EfficientProbingHead`, defaulting to `0.0`
 
 ### What Changed
 

@@ -51,9 +51,10 @@ Recent validated state:
 - Training is done per `(environment, mode, object)` group.
 - The backbone is frozen. Only the probe head is trained.
 - `pool: mean` and `pool: cls` use the cached-feature workflow.
-- `pool: patch` is reserved for Efficient Probing and uses token-aware streaming over per-group dataloaders instead of caching all patch tokens in RAM.
+- `pool: patch` is reserved for Efficient Probing and caches detached patch tokens in CPU RAM for the training run.
 - `pool: patch` excludes prefix tokens such as CLS before returning patch tokens.
 - Efficient Probing currently supports `num_heads: 1` only.
+- both probe heads support configurable `dropout` in `[0, 1)` with default `0.0`
 - Visualization overlays train, valid, and test predictions on the same plot, with one ground-truth color and split-specific prediction colors.
 - Representation visualization processes one motion directory in pose-JSON order and writes a temporal 2D plot, frame CSV, and resolved config metadata.
 - Representation visualization maps `cls` to the backbone CLS token and `patch_mean` to the existing mean-over-patch-token path; it does not use probe checkpoints.

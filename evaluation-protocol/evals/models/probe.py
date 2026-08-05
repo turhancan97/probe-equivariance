@@ -17,15 +17,19 @@ class RegressionHead(nn.Module):
         output_dim: int,
         use_layernorm: bool = True,
         depth: int = 4,
+        dropout: float = 0.0,
     ):
         super().__init__()
         if not 0 <= depth <= 4:
             raise ValueError(f"RegressionHead depth must be between 0 and 4, got {depth}")
         if feat_dim <= 0 or output_dim <= 0:
             raise ValueError("feat_dim and output_dim must be positive")
+        if not 0.0 <= dropout < 1.0:
+            raise ValueError(f"RegressionHead dropout must be in [0, 1), got {dropout}")
 
         self.norm = nn.LayerNorm(feat_dim) if use_layernorm else None
         self.depth = depth
+        self.dropout = float(dropout)
 
         if depth == 0:
             dimensions = [feat_dim, output_dim]
@@ -42,6 +46,8 @@ class RegressionHead(nn.Module):
             layers.append(nn.Linear(input_dim, output_dim_for_layer))
             if index < len(dimensions) - 2:
                 layers.append(nn.ReLU())
+                if dropout > 0.0:
+                    layers.append(nn.Dropout(dropout))
         self.regressor = nn.Sequential(*layers)
 
     def forward(self, feats: torch.Tensor) -> torch.Tensor:
@@ -123,8 +129,11 @@ class EfficientProbingHead(nn.Module):
         use_layernorm: bool = True,
         qkv_bias: bool = False,
         qk_scale: float | None = None,
+        dropout: float = 0.0,
     ):
         super().__init__()
+        if not 0.0 <= dropout < 1.0:
+            raise ValueError(f"EfficientProbingHead dropout must be in [0, 1), got {dropout}")
         self.pool = EfficientProbingPool(
             dim=feat_dim,
             num_heads=num_heads,
@@ -135,10 +144,12 @@ class EfficientProbingHead(nn.Module):
         )
         pooled_dim = self.pool.output_dim
         self.norm = nn.LayerNorm(pooled_dim) if use_layernorm else None
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
         self.regressor = nn.Linear(pooled_dim, output_dim)
 
     def forward(self, feats: torch.Tensor) -> torch.Tensor:
         pooled = self.pool(feats)
         if self.norm is not None:
             pooled = self.norm(pooled)
+        pooled = self.dropout(pooled)
         return self.regressor(pooled)
